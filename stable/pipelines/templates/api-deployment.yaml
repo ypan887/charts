@@ -1,0 +1,174 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "pipelines.api.name" . }}
+  labels:
+    app.kubernetes.io/name: {{ include "pipelines.name" . }}
+    helm.sh/chart: {{ include "pipelines.chart" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    component: {{ include "pipelines.api.name" . }}
+spec:
+  replicas: {{ .Values.api.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "pipelines.api.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      component: {{ include "pipelines.api.name" . }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "pipelines.api.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        component: {{ include "pipelines.api.name" . }}
+      annotations:
+        checksum/config: {{ include (print .Template.BasePath "/api-configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print .Template.BasePath "/api-secrets.yaml") . | sha256sum }}
+    spec:
+    {{- if .Values.imagePullSecrets }}
+      imagePullSecrets:
+      - name: {{ .Values.imagePullSecrets }}
+    {{- end }}
+      initContainers:
+        - name: wait-for-db
+          image: "{{ .Values.initContainerImage }}"
+          imagePullPolicy: {{ .Values.api.image.pullPolicy }}
+          command:
+          - 'sh'
+          - '-c'
+          - >
+            echo "Waiting for Postgres to come up...";
+            {{- if .Values.postgresql.enabled }}
+            until nc -z -w 2 {{ .Release.Name }}-postgresql {{ .Values.postgresql.service.port }} && echo database ok; do
+            {{- else }}
+            until nc -z -w 2 {{ .Values.global.postgresql.host }} {{ .Values.global.postgresql.port }} && echo database ok; do
+            {{- end }}
+              sleep 2;
+            done;
+        - name: wait-for-vault
+          image: "{{ .Values.initContainerImage }}"
+          imagePullPolicy: {{ .Values.api.image.pullPolicy }}
+          command:
+          - 'sh'
+          - '-c'
+          - >
+            echo "Waiting for Vault to come up...";
+            until nc -z -w 2 {{ include "pipelines.vault.name" . }} {{ .Values.vault.service.port }} && echo vault ok; do
+              sleep 2;
+            done;
+        - name: wait-for-redis
+          image: "{{ .Values.initContainerImage }}"
+          imagePullPolicy: {{ .Values.api.image.pullPolicy }}
+          command:
+          - 'sh'
+          - '-c'
+          - >
+            echo "Waiting for Redis to come up...";
+            until nc -z -w 2 {{ .Release.Name }}-redis-master {{ .Values.redis.redisPort }} && echo redis ok; do
+              sleep 2;
+            done;
+        - name: wait-for-rabbitmq
+          image: "{{ .Values.initContainerImage }}"
+          imagePullPolicy: {{ .Values.api.image.pullPolicy }}
+          command:
+          - 'sh'
+          - '-c'
+          - >
+            echo "Waiting for RabbitMQ to come up...";
+            {{ if .Values.rabbitmq.enabled }}
+            until nc -z -w 2 {{ .Release.Name }}-rabbitmq {{ .Values.rabbitmq.service.port }} && echo rabbitmq ok; do
+            {{- else }}
+            until nc -z -w 2 {{ include "pipelines.msg.name" . }} {{ .Values.msg.rabbitmqNodePort }} && echo rabbitmq ok; do
+            {{- end }}
+              sleep 2;
+            done;
+        - name: wait-for-artifactory
+          image: "{{ .Values.initContainerImage }}"
+          imagePullPolicy: {{ .Values.api.image.pullPolicy }}
+          command:
+          - 'sh'
+          - '-c'
+          - >
+            echo "Waiting for Artifactory to come up...";
+            apk --update add curl;
+            while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' {{ .Values.api.artifactory.url }})" != "200" ]]; do sleep 5; done;
+            echo artifactory ok;
+      containers:
+        - name: api
+          image: "{{ .Values.api.image.repository }}:{{ default .Chart.AppVersion .Values.api.image.tag }}"
+          imagePullPolicy: {{ .Values.api.image.pullPolicy }}
+          ports:
+            - name: api
+              containerPort: 30000
+          livenessProbe:
+            httpGet:
+              path: /
+              port: api
+            initialDelaySeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          readinessProbe:
+            httpGet:
+              path: /
+              port: api
+            initialDelaySeconds: 10
+            timeoutSeconds: 3
+            periodSeconds: 5
+          env:
+            - name: DBPASSWORD
+              valueFrom:
+                secretKeyRef: 
+                  name: {{ include "pipelines.fullname" . }}-api-secrets
+                  key: db-password
+            - name: RT_PASSWORD
+              valueFrom:
+                secretKeyRef: 
+                  name: {{ include "pipelines.fullname" . }}-api-secrets
+                  key: rt-password
+            - name: API_TOKEN
+              valueFrom:
+                secretKeyRef: 
+                  name: {{ include "pipelines.fullname" . }}-api-secrets
+                  key: api-token
+            - name: VAULT_TOKEN
+              valueFrom:
+                secretKeyRef: 
+                  name: root-vault-secret
+                  key: token
+            - name: MSG_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "pipelines.fullname" . }}-api-secrets
+                  key: rabbitmq-admin-password
+            - name: MSG_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "pipelines.fullname" . }}-api-secrets
+                  key: rabbitmq-adminui-password
+            - name: MSG_EXTERNAL_URL
+              valueFrom:
+                secretKeyRef: 
+                  name: {{ include "pipelines.fullname" . }}-api-secrets
+                  key: msg-external-url
+            - name: MSG_EXTERNAL_ROOT_URL
+              valueFrom:
+                secretKeyRef: 
+                  name: {{ include "pipelines.fullname" . }}-api-secrets
+                  key: msg-external-root-url     
+          envFrom:
+            - configMapRef:
+                name: {{ include "pipelines.fullname" . }}-api-config
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.api.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    {{- with .Values.api.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+    {{- with .Values.api.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}

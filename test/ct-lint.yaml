@@ -3,5 +3,5 @@ target-branch: master
 chart-dirs:
   - stable
 excluded-charts:
-  - pipelines
+  - common
 helm-extra-args: --timeout 18000

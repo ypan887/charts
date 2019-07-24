@@ -1,0 +1,92 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "pipelines.fullname" . }}-rabbitmq-setup-{{ randAlpha 6 | lower }}
+  labels:
+    app.kubernetes.io/name: {{ include "pipelines.name" . }}
+    helm.sh/chart: {{ include "pipelines.chart" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    component: rabbitmq
+  annotations:
+    "helm.sh/hook-weight": "1"
+    "helm.sh/hook": post-install
+spec:
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "pipelines.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        component: rabbitmq
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: post-install-job
+        image: "{{ .Values.pipelinesInit.image.repository }}:{{ default .Chart.AppVersion .Values.pipelinesInit.image.tag }}"
+        imagePullPolicy: {{ .Values.pipelinesInit.image.pullPolicy }}
+        env:
+        {{ if .Values.rabbitmq.enabled }}
+        - name: RABBITMQ_IP
+          value: {{ .Release.Name }}-rabbitmq
+        - name: RABBITMQ_PORT
+          value: {{ .Values.rabbitmq.service.port | quote }}
+        - name: RABBITMQ_ADMIN_PORT
+          value: {{ .Values.rabbitmq.service.managerPort | quote }}
+        - name: RABBITMQ_DEFAULT_USERNAME
+          value: {{ .Values.rabbitmq.rabbitmq.username }}
+        - name: RABBITMQ_DEFAULT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Release.Name }}-rabbitmq
+              key: rabbitmq-password  
+        {{- else }}
+        - name: RABBITMQ_IP
+          value: {{ include "pipelines.msg.name" . }}
+        - name: RABBITMQ_PORT
+          value: {{ .Values.msg.rabbitmqNodePort | quote }}
+        - name: RABBITMQ_ADMIN_PORT
+          value: {{ .Values.msg.rabbitmqAdminNodePort | quote }}
+        - name: RABBITMQ_DEFAULT_USERNAME
+          value: {{ .Values.msg.rabbitmqUsername }}
+        - name: RABBITMQ_DEFAULT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "pipelines.fullname" . }}-msg-secrets
+              key: rabbitmq-password
+        {{- end }}
+        - name: RABBITMQ_USERNAME
+          value: {{ .Values.api.rabbitMq.user }}
+        - name: RABBITMQ_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "pipelines.fullname" . }}-api-secrets
+              key: rabbitmq-admin-password
+        - name: RABBITMQ_UI_USERNAME
+          value: {{ .Values.api.rabbitMq.uiUser }}
+        - name: RABBITMQ_UI_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "pipelines.fullname" . }}-api-secrets
+              key: rabbitmq-admin-password 
+        - name: RABBITMQ_ADMIN
+          value: /scripts/rabbitmqadmin
+        - name: RUNTIME_DIR
+          value: /tmp
+        - name: SCRIPTS_DIR
+          value: /scripts
+        command:
+        - '/bin/sh'
+        - '-c'
+        - >
+          cp -fv /init-scripts/wait-for-rabbitmq.sh /scripts;
+          chmod +x /scripts/wait-for-rabbitmq.sh;
+          /scripts/wait-for-rabbitmq.sh;
+          mkdir -p /tmp/logs;
+          /scripts/initializeMsgK8s.sh;
+        volumeMounts:
+        - name: rabbitmq-setup
+          mountPath: "/init-scripts"
+      volumes:
+      - name: rabbitmq-setup
+        configMap:
+          name: {{ include "pipelines.fullname" . }}-api-setup-scripts

@@ -1,0 +1,90 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "pipelines.fullname" . }}-api-config
+  labels:
+    app.kubernetes.io/name: {{ include "pipelines.name" . }}
+    helm.sh/chart: {{ include "pipelines.chart" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    component: {{ include "pipelines.api.name" . }}
+data:
+  RELEASE: "{{ default .Chart.AppVersion .Values.api.image.tag }}"
+  INSTALL_USER: "0"
+  INSTALL_GROUP: "0"
+  RUN_MODE: {{ .Values.runMode }}
+  {{- if .Values.postgresql.enabled }}
+  DBHOST: {{ .Release.Name }}-postgresql
+  DBPORT: "{{ .Values.postgresql.service.port }}"
+  DBUSERNAME: {{ .Values.postgresql.postgresqlUsername }}
+  DBNAME: {{ .Values.postgresql.postgresqlDatabase }}
+  {{- else }}
+  DBHOST: {{ .Values.global.postgresql.host }}
+  DBPORT: "{{ .Values.global.postgresql.port }}"
+  DBUSERNAME: {{ .Values.global.postgresql.user }}
+  DBNAME: {{ .Values.global.postgresql.database }}
+  {{- end }}
+  DBDIALECT: postgres
+  RT_URL: {{ .Values.api.artifactory.url }}/artifactory
+  RT_USERNAME: {{ .Values.api.artifactory.username }}
+  RT_SERVICE_ID: {{ .Values.api.serviceId }}
+  VAULT_SERVICE_HOST: {{ include "pipelines.vault.name" . }}
+  VAULT_SERVICE_PORT: {{ .Values.vault.service.port | quote }}
+  API_SERVICE_HOST: {{ include "pipelines.api.name" . }}
+  API_SERVICE_PORT: {{ .Values.api.service.port | quote }}
+  {{- if (and .Values.api.ingress.enabled .Values.api.ingress.tls) }}
+  {{- range .Values.api.ingress.hosts }}
+  API_EXTERNAL_URL: https://{{ . }}
+  {{- end }}
+  {{- else if .Values.api.ingress.enabled }}
+  {{- range .Values.api.ingress.hosts }}
+  API_EXTERNAL_URL: http://{{ . }}
+  {{- end }}
+  {{- else }}
+  API_EXTERNAL_URL: {{ .Values.api.externalUrl }}
+  {{- end }}
+  {{- if (and .Values.www.ingress.enabled .Values.www.ingress.tls) }}
+  {{- range .Values.www.ingress.hosts }}
+  WWW_EXTERNAL_URL: https://{{ . }}
+  {{- end }}
+  {{- else if .Values.www.ingress.enabled }}
+  {{- range .Values.www.ingress.hosts }}
+  WWW_EXTERNAL_URL: http://{{ . }}
+  {{- end }}
+  {{- else }}
+  WWW_EXTERNAL_URL: {{ .Values.www.externalUrl }}
+  {{- end }}
+  MSG_EXCHANGE: shippableEx
+  MSG_VHOST: shippable
+  MSG_ROOT_VHOST: shippableRoot
+  MSG_USERNAME: {{ .Values.api.rabbitMq.uiUser }}
+  MSG_ADMIN_USERNAME: {{ .Values.api.rabbitMq.user }}
+  MSG_QUEUE_LIST: "core.pipelineSync|core.runTrigger|core.stepTrigger|core.marshaller|cluster.init|core.logup|www.signals|core.nexec"
+  {{- if .Values.rabbitmq.enabled }}
+  MSG_SERVICE_HOST: {{ .Release.Name }}-rabbitmq
+  MSG_SERVICE_PORT: {{ .Values.rabbitmq.service.port | quote }}
+  MSG_SERVICE_ADMIN_PORT: {{ .Values.rabbitmq.service.managerPort | quote }}
+  {{- else }}
+  MSG_SERVICE_HOST: {{ include "pipelines.msg.name" . }}
+  MSG_SERVICE_PORT: {{ .Values.msg.rabbitmqNodePort | quote }}
+  MSG_SERVICE_ADMIN_PORT: {{ .Values.msg.rabbitmqAdminNodePort | quote }}
+  {{- end }}
+  REDIS_SERVICE_HOST: {{ .Release.Name }}-redis-master
+  REDIS_SERVICE_PORT: "6379"
+  DEFAULT_MINION_COUNT: "1"
+  STEP_TIMEOUT_MS: "3600000"
+  ALLOW_DYNAMIC_NODES: "false"
+  ALLOW_CUSTOM_NODES: "false"
+  ALLOW_SYSTEM_NODES: "false"
+  CUSTOM_NODES_ADMIN_ONLY: "false"
+  DEFAULT_CLUSTER_TYPE: dynamic__x86_64__Ubuntu_16.04__c4.large
+  MAX_DISK_USAGE_PERCENTAGE: "90"
+  NODE_CACHE_INTERVAL_MS: "600000"
+  NODE_STOP_DAY_OF_WEEK: "0"
+  NODE_STOP_INTERVAL_DAYS: "30"
+  SUPPORT_EMAIL_ADDRESS: test@test.com
+  ROOT_BUCKET: jfrogpipelines
+  NODE_TLS_REJECT_UNAUTHORIZED: "1"
+  HARD_DELETE_INTERVAL_IN_MINS: "60"
+  MAX_NODE_CHECKIN_DELAY_MIN: "15"
+  IMAGE_REGISTRY_URL: {{ .Values.api.imageRegistry.url }}

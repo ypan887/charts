@@ -86,7 +86,7 @@ main() {
     install_helm
     git_fetch
     # Lint helm charts
-    docker run --rm -v "$(pwd):/workdir" --workdir /workdir "$IMAGE_REPOSITORY:$IMAGE_TAG" ct lint --config /workdir/test/ct.yaml | tee tmp/lint.log
+    docker run --rm -v "$(pwd):/workdir" --workdir /workdir "$IMAGE_REPOSITORY:$IMAGE_TAG" ct lint --config /workdir/test/ct-lint.yaml | tee tmp/lint.log
     echo "Done Charts Linting!"
     echo
     # Check for changelog version

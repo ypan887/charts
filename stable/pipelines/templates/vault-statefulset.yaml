@@ -1,0 +1,147 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "pipelines.vault.name" . }}
+  labels:
+    app.kubernetes.io/name: {{ include "pipelines.name" . }}
+    helm.sh/chart: {{ include "pipelines.chart" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    component: {{ include "pipelines.vault.name" . }}
+spec:
+  serviceName: {{ include "pipelines.vault.name" . }}
+  replicas: {{ .Values.vault.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "pipelines.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      component: {{ include "pipelines.vault.name" . }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "pipelines.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        component: {{ include "pipelines.vault.name" . }}
+    spec:
+    {{- if .Values.imagePullSecrets }}
+      imagePullSecrets:
+        - name: {{ .Values.imagePullSecrets }}
+    {{- end }}
+      serviceAccountName: {{ include "pipelines.vault.name" . }}
+      initContainers:
+        - name: config
+          image: "{{ .Values.initContainerImage }}"
+          imagePullPolicy: {{ .Values.vault.init.image.pullPolicy }}
+          env:
+            - name: DBPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "pipelines.fullname" . }}-api-secrets
+                  key: db-password
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              cat > /etc/vault/config/vault.hcl <<EOF
+              listener "tcp" {
+                address = "0.0.0.0:30100"
+                tls_disable = 1
+              }
+
+              storage "postgresql" {
+                {{- if .Values.postgresql.enabled }}
+                connection_url = "postgres://{{ .Values.postgresql.postgresqlUsername }}:_DBPASSWORD_@{{ .Release.Name }}-postgresql:{{ .Values.postgresql.service.port }}/{{ .Values.postgresql.postgresqlDatabase }}?sslmode=disable"
+                {{- else }}
+                connection_url = "postgres://{{ .Values.global.postgresql.user }}:_DBPASSWORD_@{{ .Values.global.postgresql.host }}:{{ .Values.global.postgresql.port }}/{{ .Values.global.postgresql.database }}?sslmode=disable"
+                {{- end }}
+              }
+
+              max_lease_ttl = "768h"
+              disable_mlock = true
+
+              EOF
+              sed -i 's#_DBPASSWORD_#'$DBPASSWORD'#' /etc/vault/config/vault.hcl
+          volumeMounts:
+            - name: vault-config
+              mountPath: /etc/vault/config
+        - name: wait-for-db
+          image: "{{ .Values.initContainerImage }}"
+          imagePullPolicy: {{ .Values.vault.init.image.pullPolicy }}
+          command:
+          - 'sh'
+          - '-c'
+          - >
+            echo "Waiting for Postgres to come up...";
+            {{- if .Values.postgresql.enabled }}
+            until nc -z -w 2 {{ .Release.Name }}-postgresql {{ .Values.postgresql.service.port }} && echo database ok; do
+            {{- else }}
+            until nc -z -w 2 {{ .Values.global.postgresql.host }} {{ .Values.global.postgresql.port }} && echo database ok; do
+            {{- end }}
+              sleep 2;
+            done;
+            sleep 10;
+      containers:
+        - name: vault-init
+          image: "{{ .Values.vault.init.image.repository }}:{{ default .Chart.AppVersion .Values.vault.init.image.tag }}"
+          imagePullPolicy: {{ .Values.vault.init.image.pullPolicy }}
+          env:
+            - name: CHECK_INTERVAL
+              value: "10s"
+            - name: VAULT_NAMESPACE
+              value: {{ .Release.Namespace }}
+            - name: VAULT_ADDRESS
+              value: "http://localhost:30100"
+        - name: vault
+          image: "{{ .Values.vault.image.repository }}:{{ .Values.vault.image.tag }}"
+          imagePullPolicy: {{ .Values.vault.image.pullPolicy }}
+          env:
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: "status.podIP"
+            - name: "VAULT_API_ADDR"
+              value: "http://$(POD_IP):30100"
+            - name: "VAULT_CLUSTER_ADDR"
+              value: "http://$(POD_IP):30101"
+          args:
+            - "server"
+            - "-config=/etc/vault/config/vault.hcl"
+          ports:
+            - name: http
+              containerPort: 30100
+              protocol: "TCP"
+            - name: server
+              containerPort: 30101
+              protocol: "TCP"
+          readinessProbe:
+            httpGet:
+              path: "/v1/sys/health?standbyok=true"
+              port: 30100
+              scheme: HTTP
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+          securityContext:
+            capabilities:
+              add:
+                - IPC_LOCK
+          volumeMounts:
+            - name: vault-config
+              mountPath: /etc/vault/config
+    {{- with .Values.vault.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+    {{- with .Values.vault.affinity }}
+      affinity:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+    {{- with .Values.vault.tolerations }}
+      tolerations:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+      volumes:
+        - name: vault-config
+          emptyDir: {}

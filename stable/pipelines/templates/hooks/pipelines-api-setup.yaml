@@ -1,0 +1,94 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "pipelines.fullname" . }}-api-setup-{{ randAlpha 6 | lower }}
+  labels:
+    app.kubernetes.io/name: {{ include "pipelines.name" . }}
+    helm.sh/chart: {{ include "pipelines.chart" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    component: pipelines-api-setup
+  annotations:
+    "helm.sh/hook-weight": "3"
+    "helm.sh/hook": post-install
+spec:
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "pipelines.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        component: pipelines-api-setup
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: {{ include "pipelines.fullname" . }}-api-setup
+      containers:
+      - name: initialize-api
+        image: "{{ .Values.pipelinesInit.image.repository }}:{{ default .Chart.AppVersion .Values.pipelinesInit.image.tag }}"
+        imagePullPolicy: {{ .Values.pipelinesInit.image.pullPolicy }}
+        env:
+        - name: PIPELINES_API_IP
+          value: {{ include "pipelines.api.name" . }}
+        - name: PIPELINES_API_PORT
+          value: {{ .Values.api.service.port | quote }}
+        - name: RT_URL
+          value: {{ .Values.api.artifactory.url }}/artifactory
+        - name: RT_USERNAME
+          value: {{ .Values.api.artifactory.username }}
+        - name: RT_PASSWORD
+          valueFrom:
+            secretKeyRef: 
+              name: {{ include "pipelines.fullname" . }}-api-secrets
+              key: rt-password
+        - name: ROOT_BUCKET
+          value: jfrogpipelines
+        - name: VAULT_TOKEN
+          valueFrom:
+            secretKeyRef: 
+              name: root-vault-secret
+              key: token
+        - name: API_TOKEN
+          valueFrom:
+            secretKeyRef: 
+              name: {{ include "pipelines.fullname" . }}-api-secrets
+              key: api-token
+        - name: CONFIG_DIR
+          value: /scripts/configs
+        - name: INSTALLER_SCRIPTS_DIR
+          value: /scripts
+        - name: INSTALLER_LIB_DIR
+          value: /scripts/lib
+        - name: TMP_DIR
+          value: /tmp
+        command:
+        - '/bin/sh'
+        - '-c'
+        - >
+          echo Prepare scripts;
+          cp -fv /init-scripts/wait-for-api.sh /scripts;
+          chmod +x /scripts/wait-for-api.sh;
+          cp -fv /init-scripts/createRootBucket.sh /scripts;
+          chmod +x /scripts/createRootBucket.sh;
+          cp -fv /init-scripts/createDefaultProviderProject.sh /scripts;
+          chmod +x /scripts/createDefaultProviderProject.sh;
+          cp -fv /init-scripts/createDefaultNodeQuotaNodePool.sh /scripts;
+          chmod +x /scripts/createDefaultNodeQuotaNodePool.sh;
+          cp -fv /init-scripts/createDefaultNodesConfigs.sh /scripts;
+          chmod +x /scripts/createDefaultNodesConfigs.sh;
+          /scripts/wait-for-api.sh;
+          echo Initialize;
+          /scripts/createRootBucket.sh;
+          /scripts/createDefaultProviderProject.sh;
+          /scripts/createDefaultNodeQuotaNodePool.sh;
+          /scripts/createDefaultNodesConfigs.sh;
+        volumeMounts:
+        - name: api-setup
+          mountPath: "/init-scripts"
+        - name: nodes-setup
+          mountPath: "/node-templates"
+      volumes:
+      - name: api-setup
+        configMap:
+          name: {{ include "pipelines.fullname" . }}-api-setup-scripts
+      - name: nodes-setup
+        configMap:
+          name: {{ include "pipelines.fullname" . }}-node-templates

@@ -1,0 +1,187 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "pipelines.fullname" . }}-k8s-node
+  labels:
+    app.kubernetes.io/name: {{ include "pipelines.name" . }}
+    helm.sh/chart: {{ include "pipelines.chart" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    component: {{ include "pipelines.chart" . }}-node
+spec:
+  replicas: {{ default 3 .Values.nodes.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "pipelines.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      component: {{ include "pipelines.chart" . }}-node
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "pipelines.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        component: {{ include "pipelines.chart" . }}-node
+    spec:
+    {{- if .Values.imagePullSecrets }}
+      imagePullSecrets:
+      - name: {{ .Values.imagePullSecrets }}
+    {{- end }}
+      serviceAccountName: {{ include "pipelines.fullname" . }}-node-sa
+      initContainers:
+      - name: wait-for-api
+        image: "{{ .Values.initContainerImage }}"
+        imagePullPolicy: {{ .Values.nodes.image.pullPolicy }}
+        command:
+        - 'sh'
+        - '-c'
+        - >
+          echo "Waiting for Pipelines API to come up...";
+          until nc -z -w 2 {{ include "pipelines.api.name" . }} {{ .Values.api.service.port }} && echo API ok; do
+            sleep 2;
+          done;
+      - name: init
+        image: "{{ .Values.nodes.image.repository }}:{{ default .Chart.AppVersion .Values.nodes.image.tag }}"
+        imagePullPolicy: {{ .Values.nodes.image.pullPolicy }}
+        command:
+        - 'sh'
+        - '-c'
+        - >
+          echo "Preparing JFrog folder...";
+          cp -vpfr /jfrog-init/* /jfrog;
+          echo "Downloading node artifacts from Pipelines API...";
+          /bin/bash /init-scripts/download-artifacts.sh;
+          echo "Registering Node with API...";
+          curl -s -H "Authorization: apiToken $API_TOKEN" -H "Content-Type: application/json" -X POST http://$PIPELINES_API_IP:$PIPELINES_API_PORT/clusterNodes -d '{"projectId":1,"friendlyName":"'"$HOSTNAME"'","location":"'"$HOSTNAME"'","initScript":"x86_64/Ubuntu_18.04/Docker_18.09.sh","isSwapEnabled":false,"clusterId":1,"nodeTypeCode":7000,"isShippableInitialized":false}' | jq '. | .id' > /jfrog/node_id;
+          echo "Node ID: \c";
+          cat /jfrog/node_id;
+        env:
+        - name: PIPELINES_API_IP
+          value: {{ include "pipelines.api.name" . }}
+        - name: PIPELINES_API_PORT
+          value: {{ .Values.api.service.port | quote }}
+        - name: API_TOKEN
+          valueFrom:
+            secretKeyRef: 
+              name: {{ include "pipelines.fullname" . }}-api-secrets
+              key: api-token
+        - name: REPORTS_DOWNLOAD_URL
+          value: "http://{{ include "pipelines.api.name" . }}:{{ .Values.api.service.port }}/passthrough/binaries/reports/reports-x86_64-Ubuntu_18.04.tar.gz"
+        - name: EXECTEMPLATES_DOWNLOAD_URL
+          value: "http://{{ include "pipelines.api.name" . }}:{{ .Values.api.service.port }}/passthrough/repoArchives/execTemplates.tar.gz"
+        - name: REQEXEC_DOWNLOAD_URL
+          value: "http://{{ include "pipelines.api.name" . }}:{{ .Values.api.service.port }}/passthrough/binaries/reqExec/reqExec-x86_64-Ubuntu_18.04.tar.gz"
+        - name: REQEXEC_DIR
+          value: "/jfrog/reqExec"
+        - name: EXECTEMPLATES_DIR
+          value: "/jfrog/execTemplates"
+        - name: REPORTS_DIR
+          value: "/jfrog/reports"
+        volumeMounts:
+        - mountPath: /init-scripts
+          name: config-volume
+        - name: jfrog-pipelines-folder
+          mountPath: /jfrog
+      containers:
+      - name: dind
+        image: "{{ .Values.nodes.dind.image.repository }}:{{ .Values.nodes.dind.image.tag }}"
+        imagePullPolicy: {{ .Values.nodes.dind.image.pullPolicy }}
+        securityContext:
+          privileged: true
+        resources:
+{{ toYaml .Values.nodes.resources | indent 10 }}
+        volumeMounts:
+        - name: docker-graph-storage
+          mountPath: /var/lib/docker
+        - name: jfrog-pipelines-folder
+          mountPath: /jfrog
+      - name: node
+        image: "{{ .Values.nodes.image.repository }}:{{ default .Chart.AppVersion .Values.nodes.image.tag }}"
+        imagePullPolicy: {{ .Values.nodes.image.pullPolicy }}
+        command:
+        - '/bin/sh'
+        - '-c'
+        - >
+          export NODE_ID="$(cat /jfrog/node_id)";
+          pm2-runtime /jfrog/reqKick/reqKick.app.js;
+        lifecycle:
+            preStop:
+              exec:
+                command:
+                - '/bin/sh'
+                - '-c'
+                - >
+                  echo "Unregistering Node with API...";
+                  export NODE_ID="$(cat /jfrog/node_id)";
+                  curl -s -H "Authorization: apiToken $API_TOKEN" -H "Content-Type: application/json" -X DELETE http://$PIPELINES_API_IP:$PIPELINES_API_PORT/clusterNodes/$NODE_ID;
+        env:
+        - name: NODE_ID
+          value: ""
+        - name: PIPELINES_API_IP
+          value: {{ include "pipelines.api.name" . }}
+        - name: PIPELINES_API_PORT
+          value: {{ .Values.api.service.port | quote }}
+        - name: API_TOKEN
+          valueFrom:
+            secretKeyRef: 
+              name: {{ include "pipelines.fullname" . }}-api-secrets
+              key: api-token
+        - name: DOCKER_HOST
+          value: tcp://localhost:2375
+        - name: RUN_MODE
+          value: {{ .Values.runMode }}
+        - name: PROJECT_ID
+          value: "1"
+        - name: LISTEN_QUEUE
+          value: "1.cluster_1"
+        - name: SHIPPABLE_NODE_ARCHITECTURE
+          value: "x86_64"
+        - name: SHIPPABLE_NODE_OPERATING_SYSTEM
+          value: "Ubuntu_18.04"
+        - name: BASE_DIR
+          value: "/jfrog"
+        - name: REQEXEC_BIN_PATH
+          value: "/jfrog/reqExec/dist/main/main"
+        - name: REQEXEC_DIR
+          value: "/jfrog/reqExec"
+        - name: EXECTEMPLATES_DIR
+          value: "/jfrog/execTemplates"
+        - name: REPORTS_DIR
+          value: "/jfrog/reports"
+        - name: SHIPPABLE_RUNTIME_VERSION
+          value: "{{ default .Chart.AppVersion .Values.api.image.tag }}"
+        - name: SHIPPABLE_RELEASE_VERSION
+          value: "{{ default .Chart.AppVersion .Values.api.image.tag }}"
+        - name: SHIPPABLE_API_URL
+          value: "http://{{ include "pipelines.api.name" . }}:{{ .Values.api.service.port }}"
+        - name: SHIPPABLE_WWW_URL
+          value: "http://{{ include "pipelines.www.name" . }}:{{ .Values.www.service.port }}"
+        - name: SHIPPABLE_AMQP_URL
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "pipelines.fullname" . }}-node-secrets
+              key: amqp_url
+        resources:
+{{ toYaml .Values.nodes.resources | indent 10 }}
+        volumeMounts:
+        - name: jfrog-pipelines-folder
+          mountPath: /jfrog
+    {{- with .Values.nodes.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+    {{- with .Values.nodes.affinity }}
+      affinity:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+    {{- with .Values.nodes.tolerations }}
+      tolerations:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+      volumes:
+      - name: docker-graph-storage
+        emptyDir: {}
+      - name: jfrog-pipelines-folder
+        emptyDir: {}
+      - name: config-volume
+        configMap:
+          name: {{ include "pipelines.fullname" . }}-node-scripts

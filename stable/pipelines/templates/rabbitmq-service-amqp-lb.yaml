@@ -1,0 +1,39 @@
+{{- if (.Values.rabbitmq.enabled) }}
+{{- if (.Values.rabbitmq.serviceLB.loadBalancerIP) }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "pipelines.name" . }}-rabbitmq-amqp-lb
+  labels:
+    app.kubernetes.io/name: {{ include "pipelines.name" . }}
+    helm.sh/chart: {{ include "pipelines.chart" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    component: rabbitmq-amqp-lb
+{{- if (.Values.rabbitmq.serviceLB.annotations) }}
+  annotations:
+    {{- range $key, $value := .Values.rabbitmq.serviceLB.annotations }}
+      {{ $key }}: {{ $value | quote }}
+    {{- end }}
+{{- end }}
+spec:
+  type: LoadBalancer
+  loadBalancerIP: {{ .Values.rabbitmq.serviceLB.loadBalancerIP }}
+{{- if (.Values.rabbitmq.serviceLB.loadBalancerSourceRanges) }}
+  loadBalancerSourceRanges:
+{{ toYaml (.Values.rabbitmq.serviceLB.loadBalancerSourceRanges) | indent 4 }}
+{{- end }}
+  ports:
+  - name: stats
+    port: 15672
+    protocol: TCP
+    targetPort: stats
+  - name: amqp
+    port: 5672
+    protocol: TCP
+    targetPort: amqp
+  selector:
+    app: rabbitmq
+    release: {{ .Release.Name }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,25 @@
+{{- if not (.Values.rabbitmq.enabled) }}
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: {{ include "pipelines.fullname" . }}-msg
+  labels:
+    app.kubernetes.io/name: {{ include "pipelines.name" . }}
+    helm.sh/chart: {{ include "pipelines.chart" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    component: {{ include "pipelines.msg.name" . }}
+spec:
+  accessModes:
+    - "ReadWriteOnce"
+  resources:
+    requests:
+      storage: {{ .Values.msg.persistence.size | quote }}
+{{- if .Values.msg.persistence.storageClass }}
+{{- if (eq "-" .Values.msg.persistence.storageClass) }}
+  storageClassName: ""
+{{- else }}
+  storageClassName: "{{ .Values.msg.persistence.storageClass }}"
+{{- end }}
+{{- end }}
+{{- end }}

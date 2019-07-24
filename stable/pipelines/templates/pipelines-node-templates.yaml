@@ -1,0 +1,113 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "pipelines.fullname" . }}-node-templates
+  labels:
+    app.kubernetes.io/name: {{ include "pipelines.name" . }}
+    helm.sh/chart: {{ include "pipelines.chart" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    component: {{ include "pipelines.api.name" . }}
+data:
+  agent-node-sa-secrets-scripts.yaml: |
+    apiVersion: v1
+    kind: ServiceAccount
+    metadata:
+      name: {{ include "pipelines.fullname" . }}-node-sa
+      namespace: {{ .Release.Namespace }}
+      labels:
+        app.kubernetes.io/name: {{ include "pipelines.name" . }}
+        helm.sh/chart: {{ include "pipelines.chart" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        component: {{ include "pipelines.chart" . }}-nodes
+    ---
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: {{ include "pipelines.fullname" . }}-node-secrets
+      namespace: {{ .Release.Namespace }}
+      labels:
+        app.kubernetes.io/name: {{ include "pipelines.name" . }}
+        helm.sh/chart: {{ include "pipelines.chart" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        component: {{ include "pipelines.chart" . }}-nodes
+    type: Opaque
+    data:
+      amqp_url: _SHIPPABLE_AMQP_URL_
+    ---
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: {{ include "pipelines.fullname" . }}-node-scripts
+      namespace: {{ .Release.Namespace }}
+      labels:
+        app.kubernetes.io/name: {{ include "pipelines.name" . }}
+        helm.sh/chart: {{ include "pipelines.chart" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        component: {{ include "pipelines.chart" . }}-nodes
+    data:
+      download-artifacts.sh: |
+        #!/bin/bash
+        set -e
+        set -o pipefail
+
+        # initScript for Ubuntu 18.04 Agent
+        # ------------------------------------------------------------------------------
+
+        log_proc_msg() {
+          local message="$@"
+          echo "|___ $@"
+        }
+
+        fetch_reports_binary() {
+          log_proc_msg "Installing report parser..."
+
+          local reports_dir="$REPORTS_DIR"
+          local reports_tar_file="reports.tar.gz"
+          rm -rf $reports_dir
+          mkdir -p $reports_dir
+          pushd $reports_dir
+            wget $REPORTS_DOWNLOAD_URL -O $reports_tar_file
+            tar -xf $reports_tar_file
+            rm -rf $reports_tar_file
+          popd
+        }
+
+        fetch_reqExec_binary() {
+          log_proc_msg "Fetching reqExec binary..."
+
+          local reqExec_tar_file="reqExec.tar.gz"
+          rm -rf $REQEXEC_DIR
+          mkdir -p $REQEXEC_DIR
+          pushd $REQEXEC_DIR
+            wget $REQEXEC_DOWNLOAD_URL -O $reqExec_tar_file
+            tar -xf $reqExec_tar_file
+            rm -rf $reqExec_tar_file
+          popd
+        }
+
+        fetch_execTemplates() {
+          log_proc_msg "Fetching execTemplates..."
+          local execTemplates_tar_file="execTemplates.tar.gz"
+
+          rm -rf $EXECTEMPLATES_DIR
+          rm -rf $execTemplates_tar_file
+          pushd /tmp
+            wget $EXECTEMPLATES_DOWNLOAD_URL -O $execTemplates_tar_file
+            mkdir -p $EXECTEMPLATES_DIR
+            tar -xzf $execTemplates_tar_file -C $EXECTEMPLATES_DIR --strip-components=1
+            rm -rf $execTemplates_tar_file
+          popd
+        }
+
+        main() {
+            fetch_reports_binary
+            
+            fetch_reqExec_binary
+            
+            fetch_execTemplates
+
+            log_proc_msg "Artifacts downloaded..."
+        }
+
+        main

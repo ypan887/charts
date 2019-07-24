@@ -1,0 +1,46 @@
+{{- if .Values.msg.serviceLB.loadBalancerIP }}
+{{- if not (.Values.rabbitmq.enabled) }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "pipelines.msg.name" . }}-amqp-lb
+  labels:
+    app.kubernetes.io/name: {{ include "pipelines.name" . }}
+    helm.sh/chart: {{ include "pipelines.chart" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    component: {{ include "pipelines.msg.name" . }}
+{{- if .Values.msg.serviceLB.annotations }}
+  annotations:
+    {{- range $key, $value := .Values.msg.serviceLB.annotations }}
+      {{ $key }}: {{ $value | quote }}
+    {{- end }}
+{{- end }}
+spec:
+  type: LoadBalancer
+  loadBalancerIP: "{{ .Values.msg.serviceLB.loadBalancerIP }}"
+{{- if .Values.msg.serviceLB.loadBalancerSourceRanges }}
+  loadBalancerSourceRanges:
+{{ toYaml .Values.msg.serviceLB.loadBalancerSourceRanges | indent 4 }}
+{{- end }}
+  ports:
+    - protocol: TCP
+      port: 5672
+      targetPort: 30200
+{{- if eq .Values.msg.service.type "NodePort" }}
+      nodePort: 30200
+{{- end }}
+      name: server
+    - protocol: TCP
+      port: 15672
+      targetPort: 30201
+{{- if eq .Values.msg.service.type "NodePort" }}
+      nodePort: 30201
+{{- end }}
+      name: admin
+  selector:
+    app.kubernetes.io/name: {{ include "pipelines.msg.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    component: {{ include "pipelines.msg.name" . }}
+{{- end }}
+{{- end }}

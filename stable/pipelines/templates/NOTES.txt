@@ -1,0 +1,13 @@
+The Pipelines Dashboard can be accessed via URL:
+
+{{- if (and .Values.www.ingress.enabled .Values.www.ingress.tls) }}
+{{- range .Values.www.ingress.hosts }}
+  https://{{ . }}
+{{- end }}
+{{- else if .Values.www.ingress.enabled }}
+{{- range .Values.www.ingress.hosts }}
+  http://{{ . }}
+{{- end }}
+{{- else }}
+  {{ .Values.www.externalUrl }}
+{{- end }}

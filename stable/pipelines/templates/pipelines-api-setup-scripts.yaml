@@ -1,0 +1,114 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "pipelines.fullname" . }}-api-setup-scripts
+  labels:
+    app.kubernetes.io/name: {{ include "pipelines.name" . }}
+    helm.sh/chart: {{ include "pipelines.chart" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    component: {{ include "pipelines.api.name" . }}
+data:
+  wait-for-db.sh: |
+    #!/bin/bash
+    echo "Waiting for Postgres to come up..."
+    until PGPASSWORD=$DB_PASSWORD psql -U $DB_USER -d $DB_NAME -h $DB_IP -p $DB_PORT -c '\l'; do
+      echo "Waiting for db availability"
+      sleep 2
+    done
+  wait-for-vault.sh: |
+    #!/bin/bash
+    echo "Waiting for Vault to come up..."
+    until nc -z -w 2 {{ include "pipelines.vault.name" . }} {{ .Values.vault.service.port }} && echo Vault ok; do
+      sleep 2;
+    done;
+  wait-for-rabbitmq.sh: |
+    #!/bin/bash
+    echo "Waiting for RabbitMQ to come up..."
+    {{ if .Values.rabbitmq.enabled }}
+    until nc -z -w 2 {{ .Release.Name }}-rabbitmq {{ .Values.rabbitmq.service.port}} && echo rabbitmq ok; do
+    {{- else }}
+    until nc -z -w 2 {{ include "pipelines.msg.name" . }} {{ .Values.msg.rabbitmqNodePort }} && echo rabbitmq ok; do
+    {{- end }}
+      sleep 2;
+    done;
+  wait-for-api.sh: |
+    #!/bin/bash
+    echo "Waiting for Pipelines API to come up..."
+    until nc -z -w 2 {{ include "pipelines.api.name" . }} {{ .Values.api.service.port }} && echo API ok; do
+      sleep 2;
+    done;
+  initializeDbK8s.sh: |
+    #!/bin/bash
+    set +e
+    set +o pipefail
+    source $INSTALLER_LIB_DIR/utils.sh
+    source $INSTALLER_SCRIPTS_DIR/initializeDb.sh
+  createRootBucket.sh: |
+    #!/bin/bash
+    set +e
+    set +o pipefail
+    source $INSTALLER_LIB_DIR/utils.sh
+    source $INSTALLER_SCRIPTS_DIR/configureState.sh
+  createDefaultNodeQuotaNodePool.sh: |
+    #!/bin/bash
+    echo
+    curl -s -H "Authorization: apiToken $API_TOKEN" -H "Content-Type: application/json" -X PUT http://$PIPELINES_API_IP:$PIPELINES_API_PORT/projects/1 -d '{"clusterLicensesPropertyBag":{"10023":{"nodeCount":{{ default 3 .Values.nodes.quotaSize }}}}}'
+    echo -n
+    echo "Default Node Quota initialized"
+    echo
+    curl -s -H "Authorization: apiToken $API_TOKEN" -H "Content-Type: application/json" -X POST http://$PIPELINES_API_IP:$PIPELINES_API_PORT/clusters -d '{"projectId":1,"name":"default_pool","clusterTypeCode":10023,"systemRuntimeTemplateId":4,"clusterNodeCount":{{ default 3 .Values.nodes.poolSize }}}'
+    echo -n
+    echo  "Default Node Pool initialized"
+  createDefaultNodesConfigs.sh: |
+    #!/bin/bash
+    echo
+    echo "Prepare Nodes config"
+    mkdir -p /tmp/nodes
+    cp -f /node-templates/agent-node-sa-secrets-scripts.yaml /tmp/nodes
+    # Get node creds
+    puser="$(curl -s -H "Authorization: apiToken $API_TOKEN" -H "Content-Type: application/json" -X GET http://$PIPELINES_API_IP:$PIPELINES_API_PORT/projects | jq '.[] | .systemPropertyBag.nodeUserName' | tr -d '"')"
+    ppass="$(curl -s -H "Authorization: apiToken $API_TOKEN" -H "Content-Type: application/json" -X GET http://$PIPELINES_API_IP:$PIPELINES_API_PORT/projects | jq '.[] | .systemPropertyBag.nodePassword' | tr -d '"')"
+    # make url
+    {{- if .Values.rabbitmq.enabled }}
+    AMQP_URL={{ (printf "amqp://$puser:$ppass@%s-rabbitmq:%v/shippable"  .Release.Name .Values.rabbitmq.service.port) }}
+    {{- else }}
+    AMQP_URL={{ (printf "amqp://$puser:$ppass@%s:%v/shippable"  (include "pipelines.msg.name" .) (.Values.msg.rabbitmqNodePort )) }}
+    {{- end }}
+    # url base64 encode
+    SHIPPABLE_AMQP_URL="$(echo $AMQP_URL | base64 | tr -d \\n)"
+    sed -i 's#_SHIPPABLE_AMQP_URL_#'$SHIPPABLE_AMQP_URL'#g' /tmp/nodes/agent-node-sa-secrets-scripts.yaml
+    kubectl apply -f /tmp/nodes/agent-node-sa-secrets-scripts.yaml
+    echo
+  createDefaultProviderProject.sh: |
+    #!/bin/bash
+    __init_vault() {
+      curl -s -H "Content-Type: application/json; charset=utf-8" -H "X-Vault-Token: $VAULT_TOKEN" -H "User-Agent: Pipelines Installer API" -H "Accept: application/json" -X POST http://{{ include "pipelines.vault.name" . }}:{{ .Values.vault.service.port }}/v1/sys/mounts/shippable -d '{"type": "generic", "description": "Pipelines secrets mount"}'
+    }
+
+    __create_default_provider() {
+      curl -s -H "Authorization: apiToken $API_TOKEN" -H "Content-Type: application/json" -X POST http://$PIPELINES_API_IP:$PIPELINES_API_PORT/providers -d '{"url":"'"$RT_URL"'", "name": "artifactory"}'
+    }
+
+    __create_default_project() {
+      curl -s -H "Authorization: apiToken $API_TOKEN" -H "Content-Type: application/json" -X POST http://$PIPELINES_API_IP:$PIPELINES_API_PORT/projects -d '{"name":"default_project", "sourceId": "default_source_id", "providerId": 1, "configPropertyBag": {}}'
+    }
+
+    main() {
+      echo
+      __init_vault
+      echo -n
+      echo "Vault initialized"
+      sleep 3
+
+      __create_default_provider
+      echo -n
+      echo "Provider initialized"
+      sleep 3
+
+      __create_default_project
+      echo -n
+      echo "Project initialized"
+    }
+
+    main

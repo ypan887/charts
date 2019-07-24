@@ -1,0 +1,29 @@
+{{- if not (.Values.rabbitmq.enabled) }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "pipelines.fullname" . }}-msg-config
+  labels:
+    app.kubernetes.io/name: {{ include "pipelines.name" . }}
+    helm.sh/chart: {{ include "pipelines.chart" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+data:
+  enabled_plugins: |-
+    [rabbitmq_management].
+  rabbitmq.config: |-
+    [
+      {rabbit,
+        [
+          {loopback_users, []},
+          {tcp_listeners, [{"0.0.0.0", 30200}]},
+          {heartbeat, 3600}
+        ]
+      },
+      {rabbitmq_management,
+        [
+          {listener, [{port, 30201}]}
+        ]
+      }
+    ].
+{{- end }}

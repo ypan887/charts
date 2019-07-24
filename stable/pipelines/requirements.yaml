@@ -1,0 +1,13 @@
+dependencies:
+- name: postgresql
+  version: 6.1.0
+  repository: https://kubernetes-charts.storage.googleapis.com/
+  condition: postgresql.enabled
+- name: redis
+  version: 8.1.5
+  repository: https://kubernetes-charts.storage.googleapis.com/
+  condition: redis.enabled
+- name: rabbitmq
+  version: 6.2.2
+  repository: https://kubernetes-charts.storage.googleapis.com/
+  condition: rabbitmq.enabled
