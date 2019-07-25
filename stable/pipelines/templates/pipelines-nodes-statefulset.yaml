@@ -101,6 +101,8 @@ spec:
         - '/bin/sh'
         - '-c'
         - >
+          echo "Pull pipelines-u18node:{{ default .Chart.AppVersion .Values.api.image.tag }}...";
+          docker pull docker.bintray.io/jfrog/pipelines-u18node:{{ default .Chart.AppVersion .Values.api.image.tag }};
           export NODE_ID="$(cat /jfrog/node_id)";
           pm2-runtime /jfrog/reqKick/reqKick.app.js;
         lifecycle:

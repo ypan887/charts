@@ -89,10 +89,11 @@ spec:
           - 'sh'
           - '-c'
           - >
-            echo "Waiting for Artifactory to come up...";
-            apk --update add curl;
-            while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' {{ .Values.api.artifactory.url }})" != "200" ]]; do sleep 5; done;
-            echo artifactory ok;
+            apk --update add bash >/dev/null 2>&1;
+            /bin/bash /init-scripts/wait-for-artifactory.sh;
+          volumeMounts:
+          - mountPath: /init-scripts
+            name: api-setup
       containers:
         - name: api
           image: "{{ .Values.api.image.repository }}:{{ default .Chart.AppVersion .Values.api.image.tag }}"
@@ -172,3 +173,7 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
     {{- end }}
+      volumes:
+      - name: api-setup
+        configMap:
+          name: {{ include "pipelines.fullname" . }}-api-setup-scripts
