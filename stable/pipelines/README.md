@@ -1,6 +1,6 @@
 # JFrog Pipelines on Kubernetes Helm Chart
 
-** Technical Preview of [JFrog Pipelines](https://jfrog.com/pipelines/), available exclusively to JFrog Enterprise+ customers**
+**Technical Preview of [JFrog Pipelines](https://jfrog.com/pipelines/), available exclusively to JFrog Enterprise+ customers**
 
 ## Prerequisites Details
 
