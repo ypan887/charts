@@ -25,6 +25,7 @@ spec:
         checksum/config: {{ include (print .Template.BasePath "/www-configmap.yaml") . | sha256sum }}
         checksum/config: {{ include (print .Template.BasePath "/api-configmap.yaml") . | sha256sum }}
     spec:
+      serviceAccountName: {{ include "pipelines.fullname" . }}
     {{- if .Values.imagePullSecrets }}
       imagePullSecrets:
       - name: {{ .Values.imagePullSecrets }}
@@ -41,9 +42,14 @@ spec:
             until nc -z -w 2 {{ include "pipelines.api.name" . }} {{ .Values.api.service.port }} && echo API ok; do
               sleep 2;
             done;
+    {{- if .Values.securityContext.enabled }}
+      securityContext:
+        runAsUser: {{ .Values.securityContext.uid }}
+        fsGroup: {{ .Values.securityContext.gid }}
+    {{- end }}
       containers:
         - name: api
-          image: "{{ .Values.www.image.repository }}:{{ default .Chart.AppVersion .Values.www.image.tag }}"
+          image: "{{ .Values.imageRegistry }}/{{ .Values.www.image.repository }}:{{ default .Chart.AppVersion .Values.www.image.tag }}"
           imagePullPolicy: {{ .Values.www.image.pullPolicy }}
           ports:
             - name: www
@@ -66,7 +72,7 @@ spec:
             - name: SHIPPABLE_API_TOKEN
               valueFrom:
                 secretKeyRef: 
-                  name: {{ include "pipelines.fullname" . }}-api-secrets
+                  name: {{ default (include "pipelines.fullname" .) .Values.existingSecret }}
                   key: api-token
           envFrom:
             - configMapRef:

@@ -23,8 +23,9 @@ spec:
         component: {{ include "pipelines.api.name" . }}
       annotations:
         checksum/config: {{ include (print .Template.BasePath "/api-configmap.yaml") . | sha256sum }}
-        checksum/secret: {{ include (print .Template.BasePath "/api-secrets.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print .Template.BasePath "/pipelines-secrets.yaml") . | sha256sum }}
     spec:
+      serviceAccountName: {{ include "pipelines.api.name" . }}
     {{- if .Values.imagePullSecrets }}
       imagePullSecrets:
       - name: {{ .Values.imagePullSecrets }}
@@ -96,7 +97,7 @@ spec:
             name: api-setup
       containers:
         - name: api
-          image: "{{ .Values.api.image.repository }}:{{ default .Chart.AppVersion .Values.api.image.tag }}"
+          image: "{{ .Values.imageRegistry }}/{{ .Values.api.image.repository }}:{{ default .Chart.AppVersion .Values.api.image.tag }}"
           imagePullPolicy: {{ .Values.api.image.pullPolicy }}
           ports:
             - name: api
@@ -119,43 +120,43 @@ spec:
             - name: DBPASSWORD
               valueFrom:
                 secretKeyRef: 
-                  name: {{ include "pipelines.fullname" . }}-api-secrets
-                  key: db-password
+                  name: {{ default (include "pipelines.fullname" .) .Values.existingSecret }}
+                  key: postgresql-password
             - name: RT_PASSWORD
               valueFrom:
                 secretKeyRef: 
-                  name: {{ include "pipelines.fullname" . }}-api-secrets
+                  name: {{ default (include "pipelines.fullname" .) .Values.existingSecret }}
                   key: rt-password
             - name: API_TOKEN
               valueFrom:
                 secretKeyRef: 
-                  name: {{ include "pipelines.fullname" . }}-api-secrets
+                  name: {{ default (include "pipelines.fullname" .) .Values.existingSecret }}
                   key: api-token
+            - name: MSG_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ default (include "pipelines.fullname" .) .Values.existingSecret }}
+                  key: rabbitmq-admin-password
+            - name: MSG_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ default (include "pipelines.fullname" .) .Values.existingSecret }}
+                  key: rabbitmq-adminui-password
+            - name: MSG_EXTERNAL_URL
+              valueFrom:
+                secretKeyRef: 
+                  name: {{ default (include "pipelines.fullname" .) .Values.existingSecret }}
+                  key: msg-external-url
+            - name: MSG_EXTERNAL_ROOT_URL
+              valueFrom:
+                secretKeyRef: 
+                  name: {{ default (include "pipelines.fullname" .) .Values.existingSecret }}
+                  key: msg-external-root-url
             - name: VAULT_TOKEN
               valueFrom:
                 secretKeyRef: 
                   name: root-vault-secret
                   key: token
-            - name: MSG_ADMIN_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "pipelines.fullname" . }}-api-secrets
-                  key: rabbitmq-admin-password
-            - name: MSG_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "pipelines.fullname" . }}-api-secrets
-                  key: rabbitmq-adminui-password
-            - name: MSG_EXTERNAL_URL
-              valueFrom:
-                secretKeyRef: 
-                  name: {{ include "pipelines.fullname" . }}-api-secrets
-                  key: msg-external-url
-            - name: MSG_EXTERNAL_ROOT_URL
-              valueFrom:
-                secretKeyRef: 
-                  name: {{ include "pipelines.fullname" . }}-api-secrets
-                  key: msg-external-root-url     
           envFrom:
             - configMapRef:
                 name: {{ include "pipelines.fullname" . }}-api-config

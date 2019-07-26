@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ include "pipelines.fullname" . }}-db-setup-upgrade-{{ randAlpha 6 | lower }}
+  name: {{ include "pipelines.fullname" . }}-db-setup-upgrade-{{ randAlpha 8 | lower }}
   labels:
     app.kubernetes.io/name: {{ include "pipelines.name" . }}
     helm.sh/chart: {{ include "pipelines.chart" . }}
@@ -11,6 +11,8 @@ metadata:
   annotations:
     "helm.sh/hook-weight": "1"
     "helm.sh/hook": pre-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation
+    #"helm.sh/hook-delete-policy": hook-succeeded
 spec:
   template:
     metadata:
@@ -22,7 +24,7 @@ spec:
       restartPolicy: OnFailure
       containers:
       - name: post-install-job
-        image: "{{ .Values.pipelinesInit.image.repository }}:{{ default .Chart.AppVersion .Values.pipelinesInit.image.tag }}"
+        image: "{{ .Values.imageRegistry }}/{{ .Values.pipelinesInit.image.repository }}:{{ default .Chart.AppVersion .Values.pipelinesInit.image.tag }}"
         imagePullPolicy: {{ .Values.pipelinesInit.image.pullPolicy }}
         env:
         {{- if .Values.postgresql.enabled }}
@@ -63,13 +65,13 @@ spec:
         - name: DB_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: {{ include "pipelines.fullname" . }}-api-secrets
-              key: db-password
+              name: {{ default (include "pipelines.fullname" .) .Values.existingSecret }}
+              key: postgresql-password
         - name: DBPASSWORD
           valueFrom:
             secretKeyRef:
-              name: {{ include "pipelines.fullname" . }}-api-secrets
-              key: db-password
+              name: {{ default (include "pipelines.fullname" .) .Values.existingSecret }}
+              key: postgresql-password
         - name: IMAGE_REGISTRY_URL
           value: {{ .Values.api.imageRegistry.url }}
         - name: RELEASE

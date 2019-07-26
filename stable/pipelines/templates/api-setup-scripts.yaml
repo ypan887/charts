@@ -81,7 +81,7 @@ data:
     echo
     echo "Prepare Nodes config"
     mkdir -p /tmp/nodes
-    cp -f /node-templates/agent-node-sa-secrets-scripts.yaml /tmp/nodes
+    cp -fv /node-templates/agent-node-sa-secrets-scripts.yaml /tmp/nodes
     # Get node creds
     puser="$(curl -s -H "Authorization: apiToken $API_TOKEN" -H "Content-Type: application/json" -X GET http://$PIPELINES_API_IP:$PIPELINES_API_PORT/projects | jq '.[] | .systemPropertyBag.nodeUserName' | tr -d '"')"
     ppass="$(curl -s -H "Authorization: apiToken $API_TOKEN" -H "Content-Type: application/json" -X GET http://$PIPELINES_API_IP:$PIPELINES_API_PORT/projects | jq '.[] | .systemPropertyBag.nodePassword' | tr -d '"')"
@@ -122,7 +122,7 @@ data:
       echo "Provider initialized"
       sleep 3
 
-      __create_default_project
+      __create_default_project >/dev/null 2>&1
       echo -n
       echo "Project initialized"
     }

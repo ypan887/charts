@@ -1,4 +1,4 @@
-{{- if .Values.www.ingress.enabled -}}
+{{- if .Values.www.ingress.enabled }}
 {{- $fullName := include "pipelines.www.name" . -}}
 {{- $ingressPath := .Values.api.ingress.path -}}
 {{- if semverCompare ">=v1.14.0" .Capabilities.KubeVersion.GitVersion }}

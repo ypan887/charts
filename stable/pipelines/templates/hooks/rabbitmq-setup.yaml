@@ -11,6 +11,7 @@ metadata:
   annotations:
     "helm.sh/hook-weight": "1"
     "helm.sh/hook": post-install
+    #"helm.sh/hook-delete-policy": hook-succeeded
 spec:
   template:
     metadata:
@@ -22,7 +23,7 @@ spec:
       restartPolicy: OnFailure
       containers:
       - name: post-install-job
-        image: "{{ .Values.pipelinesInit.image.repository }}:{{ default .Chart.AppVersion .Values.pipelinesInit.image.tag }}"
+        image: "{{ .Values.imageRegistry }}/{{ .Values.pipelinesInit.image.repository }}:{{ default .Chart.AppVersion .Values.pipelinesInit.image.tag }}"
         imagePullPolicy: {{ .Values.pipelinesInit.image.pullPolicy }}
         env:
         {{ if .Values.rabbitmq.enabled }}
@@ -34,6 +35,7 @@ spec:
           value: {{ .Values.rabbitmq.service.managerPort | quote }}
         - name: RABBITMQ_DEFAULT_USERNAME
           value: {{ .Values.rabbitmq.rabbitmq.username }}
+        ## TODO: set external secret  
         - name: RABBITMQ_DEFAULT_PASSWORD
           valueFrom:
             secretKeyRef:
@@ -51,7 +53,7 @@ spec:
         - name: RABBITMQ_DEFAULT_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: {{ include "pipelines.fullname" . }}-msg-secrets
+              name: {{ default (include "pipelines.fullname" .) .Values.existingSecret }}
               key: rabbitmq-password
         {{- end }}
         - name: RABBITMQ_USERNAME
@@ -59,14 +61,14 @@ spec:
         - name: RABBITMQ_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: {{ include "pipelines.fullname" . }}-api-secrets
+              name: {{ default (include "pipelines.fullname" .) .Values.existingSecret }}
               key: rabbitmq-admin-password
         - name: RABBITMQ_UI_USERNAME
           value: {{ .Values.api.rabbitMq.uiUser }}
         - name: RABBITMQ_UI_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: {{ include "pipelines.fullname" . }}-api-secrets
+              name: {{ default (include "pipelines.fullname" .) .Values.existingSecret }}
               key: rabbitmq-admin-password 
         - name: RABBITMQ_ADMIN
           value: /scripts/rabbitmqadmin

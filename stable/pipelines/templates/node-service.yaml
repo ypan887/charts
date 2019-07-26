@@ -1,25 +1,21 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "pipelines.vault.name" . }}
+  name: {{ include "pipelines.fullname" . }}-k8s-node
   labels:
     app.kubernetes.io/name: {{ include "pipelines.name" . }}
     helm.sh/chart: {{ include "pipelines.chart" . }}
     app.kubernetes.io/instance: {{ .Release.Name }}
     app.kubernetes.io/managed-by: {{ .Release.Service }}
-    component: {{ include "pipelines.vault.name" . }}
+    component: {{ include "pipelines.chart" . }}-node
 spec:
   type: ClusterIP
+  clusterIP: None
   ports:
-    - name: http
-      port: {{ .Values.vault.service.port }}
-      # nodePort: 30100
-      targetPort: 30100
-      protocol: TCP
-    - name: server
-      port: 30101
+    - name: node
+      port: 30300
       protocol: TCP  
   selector:
     app.kubernetes.io/name: {{ include "pipelines.name" . }}
     app.kubernetes.io/instance: {{ .Release.Name }}
-    component: {{ include "pipelines.vault.name" . }}
+    component: {{ include "pipelines.chart" . }}-node

@@ -1,0 +1,29 @@
+{{- if .Values.rbac.create }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "pipelines.api.name" . }}
+  labels:
+    app.kubernetes.io/name: {{ include "pipelines.name" . }}
+    helm.sh/chart: {{ include "pipelines.chart" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    component: {{ include "pipelines.api.name" . }}
+rules:
+- apiGroups:
+  - "*"
+  resources:
+  - secrets
+  - configmaps
+  - statefulsets
+  - deployments
+  - replicaset-controller
+  - pods
+  verbs:
+  - get
+  - list
+  - create
+  - update
+  - patch
+  - delete
+{{- end }}

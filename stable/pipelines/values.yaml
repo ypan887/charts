@@ -3,19 +3,30 @@
 # Common
 initContainerImage: "alpine:3.9"
 
+# Available modes: devmode (enable it for debuging) and production
+runMode: production
+
+# Image Registry to pull images from for Pipelines micro-services
+# You can override it with your private Artifactory registry
+imageRegistry: docker.bintray.io
+
 # For supporting pulling from private registries
 imagePullSecrets:
 
-nameOverride: ""
-fullnameOverride: ""
+# Existing secret with Pipelines secrets
+existingSecret:
 
-secretName:
+# String to partially override pipelines.fullname template (will maintain the release name)
+# nameOverride:
 
-runMode: production
+# String to fully override pipelines.fullname template
+# fullnameOverride:
 
-rbac:
-  create: true
-
+# Set user/gruop to run Pipleines micro-services with
+securityContext:
+  enabled: true
+  uid: 1030
+  gid: 1030
 
 # The nodes are where the actual builds will run in Kubernetes
 nodes:
@@ -26,7 +37,7 @@ nodes:
   replicaCount: 3
 
   image:
-    repository: docker.bintray.io/pipelines-node
+    repository: pipelines-node
     # tag:
     pullPolicy: Always
 
@@ -49,7 +60,7 @@ api:
   replicaCount: 1
 
   image:
-    repository: docker.bintray.io/jfrog/pipelines-api
+    repository: jfrog/pipelines-api
     # tag:
     pullPolicy: IfNotPresent
 
@@ -133,7 +144,7 @@ www:
   replicaCount: 1
 
   image:
-    repository: docker.bintray.io/jfrog/pipelines-www
+    repository: jfrog/pipelines-www
     # tag:
     pullPolicy: IfNotPresent
 
@@ -186,7 +197,7 @@ www:
 cron:
 
   image:
-    repository: docker.bintray.io/jfrog/pipelines-micro
+    repository: jfrog/pipelines-micro
     # tag:
     pullPolicy: IfNotPresent
 
@@ -206,7 +217,7 @@ nexec:
   replicaCount: 1
 
   image:
-    repository: docker.bintray.io/jfrog/pipelines-micro
+    repository: jfrog/pipelines-micro
     # tag:
     pullPolicy: IfNotPresent
 
@@ -226,7 +237,7 @@ pipelineSync:
   replicaCount: 1
 
   image:
-    repository: docker.bintray.io/jfrog/pipelines-micro
+    repository: jfrog/pipelines-micro
     # tag:
     pullPolicy: IfNotPresent
 
@@ -246,7 +257,7 @@ runTrigger:
   replicaCount: 1
 
   image:
-    repository: docker.bintray.io/jfrog/pipelines-micro
+    repository: jfrog/pipelines-micro
     # tag:
     pullPolicy: IfNotPresent
 
@@ -265,7 +276,7 @@ runTrigger:
 stepTrigger:
 
   image:
-    repository: docker.bintray.io/jfrog/pipelines-micro
+    repository: jfrog/pipelines-micro
     # tag:
     pullPolicy: IfNotPresent
 
@@ -283,7 +294,7 @@ stepTrigger:
 
 pipelinesInit:
   image:
-    repository: docker.bintray.io/pipelines-init
+    repository: pipelines-init
     # tag:
     pullPolicy: Always
 
@@ -310,7 +321,13 @@ postgresql:
 
   postgresqlDatabase: "pipelinesdb"
   postgresqlUsername: "apiuser"
+
   postgresqlPassword: ""
+
+  ## PostgreSQL password using existing secret
+  # existingSecret: secret
+  ## Mount PostgreSQL secret as a file instead of passing environment variable
+  # usePasswordFile: false
 
   service:
     port: 5432
@@ -336,7 +353,7 @@ postgresql:
 msg:
 
   image:
-    repository: docker.bintray.io/jfrog/pipelines-msg
+    repository: jfrog/pipelines-msg
     # tag:
     pullPolicy: IfNotPresent
 
@@ -406,7 +423,7 @@ msg:
   affinity: {}
   tolerations: []
 
-# RabbitMQ - NOT SUPPORTED YET, Pipelines API needs some fixes!!!
+# RabbitMQ
 ## Configuration values for the rabbitmq dependency
 ## ref: https://github.com/kubernetes/charts/blob/master/stable/rabbitmq/README.md
 ##
@@ -417,8 +434,16 @@ rabbitmq:
 
   rabbitmq:
     username: user
+
+    ## RabbitMQ application password
+    ## ref: https://github.com/bitnami/bitnami-docker-rabbitmq#environment-variables
     password:
+    # existingPasswordSecret: name-of-existing-secret
+
+    ## Erlang cookie to determine whether different nodes are allowed to communicate with each other
     erlangCookie: PIPELINESRABBITMQCLUSTER
+    # existingErlangSecret: name-of-existing-secret
+
     plugins: "rabbitmq_management rabbitmq_peer_discovery_k8s"
 
   service:
@@ -515,7 +540,7 @@ vault:
 
   init:
     image:
-      repository: docker.bintray.io/pipelines-vault-init
+      repository: pipelines-vault-init
       tag: 0.1.6
       pullPolicy: IfNotPresent
 
@@ -540,3 +565,7 @@ vault:
         - secrets
         verbs:
         - "*"
+
+#
+rbac:
+  create: true

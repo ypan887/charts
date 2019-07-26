@@ -19,7 +19,10 @@ spec:
       labels:
         app.kubernetes.io/name: {{ include "pipelines.nexec.name" . }}
         app.kubernetes.io/instance: {{ .Release.Name }}
+      annotations:
+        checksum/config: {{ include (print .Template.BasePath "/components-config.yaml") . | sha256sum }}
     spec:
+      serviceAccountName: {{ include "pipelines.fullname" . }}
     {{- if .Values.imagePullSecrets }}
       imagePullSecrets:
       - name: {{ .Values.imagePullSecrets }}
@@ -36,9 +39,14 @@ spec:
             until nc -z -w 2 {{ include "pipelines.api.name" . }} {{ .Values.api.service.port }} && echo API ok; do
               sleep 2;
             done;
+    {{- if .Values.securityContext.enabled }}
+      securityContext:
+        runAsUser: {{ .Values.securityContext.uid }}
+        fsGroup: {{ .Values.securityContext.gid }}
+    {{- end }}
       containers:
         - name: api
-          image: "{{ .Values.nexec.image.repository }}:{{ default .Chart.AppVersion .Values.nexec.image.tag }}"
+          image: "{{ .Values.imageRegistry }}/{{ .Values.nexec.image.repository }}:{{ default .Chart.AppVersion .Values.nexec.image.tag }}"
           imagePullPolicy: {{ .Values.nexec.image.pullPolicy }}
           env:
             - name: COMPONENT
@@ -46,7 +54,7 @@ spec:
             - name: SHIPPABLE_API_TOKEN
               valueFrom:
                 secretKeyRef: 
-                  name: {{ include "pipelines.fullname" . }}-api-secrets
+                  name: {{ default (include "pipelines.fullname" .) .Values.existingSecret }}
                   key: api-token
           envFrom:
             - configMapRef:

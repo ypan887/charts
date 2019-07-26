@@ -9,6 +9,7 @@ metadata:
     app.kubernetes.io/managed-by: {{ .Release.Service }}
     component: {{ include "pipelines.chart" . }}-node
 spec:
+  serviceName: {{ include "pipelines.fullname" . }}-k8s-node
   replicas: {{ default 3 .Values.nodes.replicaCount }}
   selector:
     matchLabels:
@@ -21,6 +22,8 @@ spec:
         app.kubernetes.io/name: {{ include "pipelines.name" . }}
         app.kubernetes.io/instance: {{ .Release.Name }}
         component: {{ include "pipelines.chart" . }}-node
+      annotations:
+        checksum/config: {{ include (print .Template.BasePath "/node-templates.yaml") . | sha256sum }}
     spec:
     {{- if .Values.imagePullSecrets }}
       imagePullSecrets:
@@ -40,7 +43,7 @@ spec:
             sleep 2;
           done;
       - name: init
-        image: "{{ .Values.nodes.image.repository }}:{{ default .Chart.AppVersion .Values.nodes.image.tag }}"
+        image: "{{ .Values.imageRegistry }}/{{ .Values.nodes.image.repository }}:{{ default .Chart.AppVersion .Values.nodes.image.tag }}"
         imagePullPolicy: {{ .Values.nodes.image.pullPolicy }}
         command:
         - 'sh'
@@ -62,7 +65,7 @@ spec:
         - name: API_TOKEN
           valueFrom:
             secretKeyRef: 
-              name: {{ include "pipelines.fullname" . }}-api-secrets
+              name: {{ default (include "pipelines.fullname" .) .Values.existingSecret }}
               key: api-token
         - name: REPORTS_DOWNLOAD_URL
           value: "http://{{ include "pipelines.api.name" . }}:{{ .Values.api.service.port }}/passthrough/binaries/reports/reports-x86_64-Ubuntu_18.04.tar.gz"
@@ -95,14 +98,14 @@ spec:
         - name: jfrog-pipelines-folder
           mountPath: /jfrog
       - name: node
-        image: "{{ .Values.nodes.image.repository }}:{{ default .Chart.AppVersion .Values.nodes.image.tag }}"
+        image: "{{ .Values.imageRegistry }}/{{ .Values.nodes.image.repository }}:{{ default .Chart.AppVersion .Values.nodes.image.tag }}"
         imagePullPolicy: {{ .Values.nodes.image.pullPolicy }}
         command:
         - '/bin/sh'
         - '-c'
         - >
           echo "Pull pipelines-u18node:{{ default .Chart.AppVersion .Values.api.image.tag }}...";
-          docker pull docker.bintray.io/jfrog/pipelines-u18node:{{ default .Chart.AppVersion .Values.api.image.tag }};
+          docker pull {{ .Values.api.imageRegistry.url }}/jfrog/pipelines-u18node:{{ default .Chart.AppVersion .Values.api.image.tag }};
           export NODE_ID="$(cat /jfrog/node_id)";
           pm2-runtime /jfrog/reqKick/reqKick.app.js;
         lifecycle:
@@ -125,7 +128,7 @@ spec:
         - name: API_TOKEN
           valueFrom:
             secretKeyRef: 
-              name: {{ include "pipelines.fullname" . }}-api-secrets
+              name: {{ default (include "pipelines.fullname" .) .Values.existingSecret }}
               key: api-token
         - name: DOCKER_HOST
           value: tcp://localhost:2375

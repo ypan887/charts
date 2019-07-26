@@ -26,16 +26,17 @@ spec:
         component: {{ include "pipelines.msg.name" . }}
       annotations:
         checksum/config: {{ include (print .Template.BasePath "/msg-configmap.yaml") . | sha256sum }}
-        checksum/secret: {{ include (print .Template.BasePath "/msg-secrets.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print .Template.BasePath "/pipelines-secrets.yaml") . | sha256sum }}
         pod.beta.kubernetes.io/hostname: {{ include "pipelines.msg.name" . }}
     spec:
+      serviceAccountName: {{ include "pipelines.fullname" . }}
     {{- if .Values.imagePullSecrets }}
       imagePullSecrets:
       - name: {{ .Values.imagePullSecrets }}
     {{- end }}
       containers:
         - name: msg
-          image: "{{ .Values.msg.image.repository }}:{{ default .Chart.AppVersion .Values.msg.image.tag }}"
+          image: "{{ .Values.imageRegistry }}/{{ .Values.msg.image.repository }}:{{ default .Chart.AppVersion .Values.msg.image.tag }}"
           imagePullPolicy: {{ .Values.msg.image.pullPolicy }}
           ports:
             - containerPort: 30200
@@ -48,7 +49,7 @@ spec:
             - name: RABBITMQ_DEFAULT_PASS
               valueFrom:
                 secretKeyRef: 
-                  name: {{ include "pipelines.fullname" . }}-msg-secrets
+                  name: {{ default (include "pipelines.fullname" .) .Values.existingSecret }}
                   key: rabbitmq-password
           volumeMounts:
             - mountPath: /var/lib/rabbitmq/mnesia

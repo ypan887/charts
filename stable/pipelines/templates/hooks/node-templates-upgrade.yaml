@@ -1,16 +1,17 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ include "pipelines.fullname" . }}-api-setup-{{ randAlpha 6 | lower }}
+  name: {{ include "pipelines.fullname" . }}-node-templates-upgrade-{{ randAlpha 8 | lower }}
   labels:
     app.kubernetes.io/name: {{ include "pipelines.name" . }}
     helm.sh/chart: {{ include "pipelines.chart" . }}
     app.kubernetes.io/instance: {{ .Release.Name }}
     app.kubernetes.io/managed-by: {{ .Release.Service }}
-    component: pipelines-api-setup
+    component: {{ include "pipelines.chart" . }}-node
   annotations:
-    "helm.sh/hook-weight": "3"
-    "helm.sh/hook": post-install
+    "helm.sh/hook-weight": "1"
+    "helm.sh/hook": pre-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation
     #"helm.sh/hook-delete-policy": hook-succeeded
 spec:
   template:
@@ -18,12 +19,12 @@ spec:
       labels:
         app.kubernetes.io/name: {{ include "pipelines.name" . }}
         app.kubernetes.io/instance: {{ .Release.Name }}
-        component: pipelines-api-setup
+        component: {{ include "pipelines.chart" . }}-node
     spec:
       restartPolicy: OnFailure
       serviceAccountName: {{ include "pipelines.fullname" . }}-api-setup
       containers:
-      - name: initialize-api
+      - name: node-templates-upgrade
         image: "{{ .Values.imageRegistry }}/{{ .Values.pipelinesInit.image.repository }}:{{ default .Chart.AppVersion .Values.pipelinesInit.image.tag }}"
         imagePullPolicy: {{ .Values.pipelinesInit.image.pullPolicy }}
         env:
@@ -31,33 +32,11 @@ spec:
           value: {{ include "pipelines.api.name" . }}
         - name: PIPELINES_API_PORT
           value: {{ .Values.api.service.port | quote }}
-        - name: RT_URL
-          value: {{ .Values.api.artifactory.url }}/artifactory
-        - name: RT_USERNAME
-          value: {{ .Values.api.artifactory.username }}
-        - name: RT_PASSWORD
-          valueFrom:
-            secretKeyRef: 
-              name: {{ default (include "pipelines.fullname" .) .Values.existingSecret }}
-              key: rt-password
-        - name: ROOT_BUCKET
-          value: jfrogpipelines
-        - name: VAULT_TOKEN
-          valueFrom:
-            secretKeyRef: 
-              name: root-vault-secret
-              key: token
         - name: API_TOKEN
           valueFrom:
             secretKeyRef: 
               name: {{ default (include "pipelines.fullname" .) .Values.existingSecret }}
               key: api-token
-        - name: CONFIG_DIR
-          value: /scripts/configs
-        - name: INSTALLER_SCRIPTS_DIR
-          value: /scripts
-        - name: INSTALLER_LIB_DIR
-          value: /scripts/lib
         - name: TMP_DIR
           value: /tmp
         command:
@@ -65,21 +44,12 @@ spec:
         - '-c'
         - >
           echo Prepare scripts;
-          cp -fv /init-scripts/wait-for-api.sh /scripts;
+          cp -f /init-scripts/wait-for-api.sh /scripts;
           chmod +x /scripts/wait-for-api.sh;
-          cp -fv /init-scripts/createRootBucket.sh /scripts;
-          chmod +x /scripts/createRootBucket.sh;
-          cp -fv /init-scripts/createDefaultProviderProject.sh /scripts;
-          chmod +x /scripts/createDefaultProviderProject.sh;
-          cp -fv /init-scripts/createDefaultNodeQuotaNodePool.sh /scripts;
-          chmod +x /scripts/createDefaultNodeQuotaNodePool.sh;
-          cp -fv /init-scripts/createDefaultNodesConfigs.sh /scripts;
+          cp -f /init-scripts/createDefaultNodesConfigs.sh /scripts;
           chmod +x /scripts/createDefaultNodesConfigs.sh;
           /scripts/wait-for-api.sh;
-          echo Initialize;
-          /scripts/createRootBucket.sh;
-          /scripts/createDefaultProviderProject.sh;
-          /scripts/createDefaultNodeQuotaNodePool.sh;
+          echo Initialize Nodes Configs;
           /scripts/createDefaultNodesConfigs.sh;
         volumeMounts:
         - name: api-setup

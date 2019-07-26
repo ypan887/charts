@@ -36,8 +36,8 @@ spec:
             - name: DBPASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "pipelines.fullname" . }}-api-secrets
-                  key: db-password
+                  name: {{ default (include "pipelines.fullname" .) .Values.existingSecret }}
+                  key: postgresql-password
           command: ["/bin/sh", "-c"]
           args:
             - |
@@ -81,7 +81,7 @@ spec:
             sleep 10;
       containers:
         - name: vault-init
-          image: "{{ .Values.vault.init.image.repository }}:{{ default .Chart.AppVersion .Values.vault.init.image.tag }}"
+          image: "{{ .Values.imageRegistry }}/{{ .Values.vault.init.image.repository }}:{{ default .Chart.AppVersion .Values.vault.init.image.tag }}"
           imagePullPolicy: {{ .Values.vault.init.image.pullPolicy }}
           env:
             - name: CHECK_INTERVAL
