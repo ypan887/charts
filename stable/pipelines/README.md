@@ -47,50 +47,28 @@ Custom Base URL: https://myartifactory.example.com/artifactory
 - [Nginx-ingress controller](https://hub.helm.sh/charts/stable/nginx-ingress)
 - [Cert-manager](https://hub.helm.sh/charts/jetstack/cert-manager) (optional) installed there or use your own TLS cert for your domain.
 
-As you will need `values-ingress.yaml` and `values-ingress-external-secret.yaml` files in later steps, pull latest chart:
+As you will need `values-ingress.yaml`, `values-ingress-passwords.yaml` and `values-ingress-external-secret.yaml` files in later steps, pull latest chart:
 ```console
 helm fetch jfrog/pipelines --untar
 ```
 
-Please **update** passwords and URLs in `values-ingress.yaml` and then install JFrog Pipelines:
+Please **update**:
+- URLs in `values-ingress.yaml`
+- Passwords in `values-ingress-passwords.yaml`
+
+Install JFrog Pipelines:
  ```console
-helm upgrade --install pipelines --namespace pipelines jfrog/pipelines -f values-ingress.yaml
+helm upgrade --install pipelines --namespace pipelines jfrog/pipelines -f values-ingress.yaml -f values-ingress-passwords.yaml
 ```
 
 ### How to use external secret
 
 **Note:** It is in best recommended practices to use external secrets instead of storing passwords in `values.yaml` files.
 
-Pipelines chart comes with an example of `values-ingress-external-secret.yaml` which uses the same external secret for the Pipelines and PostgreSQL.
-
-Fill in all required passwords in `values-ingress.yaml` and generate Kubernetes template file:
+Fill in all required passwords in `values-ingress-passwords.yaml` and create and install the external secret:
 ```console
-helm template pipelines/ -x templates/pipelines-secrets.yaml -f values-ingress.yaml
-```
-
-Copy output content to `pipelines-external-secret.yaml` file.
-
-Change secret name to `pipelines-external-secret` and remove `labels` section as it has Helm release related information, and it should look similar to:
-```yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: pipelines-external-secret
-type: Opaque
-data:
-  postgresql-password: "xxxxx"
-  rt-password: "xxxxx"
-  api-token: "xxxxx"
-  msg-external-url: xxxxx
-  msg-external-root-url: xxxx
-  rabbitmq-admin-password: "xxxxx"
-  rabbitmq-adminui-password: "xxxxx"
-  rabbitmq-password: "xxxxx"
-```
-
-Deploy the secret:
-```console
-kubectl -n your_pipelines_namespace apply -f pipelines-external-secret.yaml
+helm template --name pipelines-external-secrets pipelines/ -x templates/pipelines-secrets.yaml \
+    -f values-ingress-passwords.yaml | kubectl apply --namespace pipelines -f -
 ```
 
 Install JFrog Pipelines with `values-ingress-external-secret.yaml` file, please **update** URLs there.

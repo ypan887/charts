@@ -6,7 +6,7 @@ initContainerImage: "alpine:3.9"
 # Available modes: devmode (enable it for debuging) and production
 runMode: production
 
-# Image Registry to pull images from for Pipelines micro-services
+# Image Registry to pull images from for Pipelines components
 # You can override it with your private Artifactory registry
 imageRegistry: docker.bintray.io
 
@@ -22,7 +22,7 @@ existingSecret:
 # String to fully override pipelines.fullname template
 # fullnameOverride:
 
-# Set user/gruop to run Pipleines micro-services with
+# Set user/group to run Pipleines components with
 securityContext:
   enabled: true
   uid: 1030
@@ -55,7 +55,7 @@ nodes:
 
     resources: {}
 
-# Pipelines micro-services
+# Pipelines components
 api:
   replicaCount: 1
 
@@ -308,8 +308,9 @@ global:
     user: "apiuser"
     password: ""
 
-# Databases
-# PostgreSQL
+
+# PostgreSQL 
+## https://hub.helm.sh/charts/bitnami/postgresql
 ## Configuration values for the postgresql dependency
 ## ref: https://github.com/kubernetes/charts/blob/master/stable/postgresql/README.md
 ##
@@ -321,7 +322,6 @@ postgresql:
 
   postgresqlDatabase: "pipelinesdb"
   postgresqlUsername: "apiuser"
-
   postgresqlPassword: ""
 
   ## PostgreSQL password using existing secret
@@ -349,7 +349,7 @@ postgresql:
     affinity: {}
     tolerations: []
 
-# RabbitMQ
+# RabbitMQ - built in non HA RabbitMQ
 msg:
 
   image:
@@ -423,7 +423,8 @@ msg:
   affinity: {}
   tolerations: []
 
-# RabbitMQ
+# RabbitMQ HA - WIP: Pipelines API needs to support it!
+## https://hub.helm.sh/charts/bitnami/rabbitmq
 ## Configuration values for the rabbitmq dependency
 ## ref: https://github.com/kubernetes/charts/blob/master/stable/rabbitmq/README.md
 ##

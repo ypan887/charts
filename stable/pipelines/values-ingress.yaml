@@ -7,20 +7,15 @@
 api:
   replicaCount: 1
   
-  token: f562d4fa-cf5f-4d58-8b9b-91ef949c024f
-  
   serviceId: jfpip@2019223311
   
   artifactory:
     url: https://artifactory.example.com
     username: admin
-    password: somepassword
 
   rabbitMq:
     user: admin
-    userPassword: somepassword
     uiUser: adminui
-    uiUserPassword: somepassword
 
   ingress:
     enabled: true
@@ -74,10 +69,6 @@ www:
         hosts:
           - pipelines.example.com
 
-# PostgreSQL
-postgresql:
-  postgresqlPassword: somepassword
-
 # RabbitMQ
 msg:
 
@@ -96,7 +87,6 @@ msg:
     loadBalancerSourceRanges: []
 
   rabbitmqUsername: guest
-  rabbitmqPassword: guest
   rabbitmqNodePort: 30200
   rabbitmqAdminNodePort: 30201
 
