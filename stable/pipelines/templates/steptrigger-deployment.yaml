@@ -61,7 +61,7 @@ spec:
                 name: {{ include "pipelines.fullname" . }}-components-config
           workingDir: /shippable/micro/nod/stepTrigger
           resources:
-            {{- toYaml .Values.resources | nindent 12 }}
+            {{- toYaml .Values.stepTrigger.resources | nindent 12 }}
       {{- with .Values.stepTrigger.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

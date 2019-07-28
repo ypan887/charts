@@ -61,7 +61,7 @@ spec:
                 name: {{ include "pipelines.fullname" . }}-components-config
           workingDir: /shippable/micro/nod/nexec
           resources:
-            {{- toYaml .Values.resources | nindent 12 }}
+            {{- toYaml .Values.nexec.resources | nindent 12 }}
       {{- with .Values.nexec.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

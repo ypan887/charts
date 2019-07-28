@@ -78,7 +78,7 @@ spec:
             - configMapRef:
                 name: {{ include "pipelines.fullname" . }}-www-config
           resources:
-            {{- toYaml .Values.resources | nindent 12 }}
+            {{- toYaml .Values.www.resources | nindent 12 }}
       {{- with .Values.www.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

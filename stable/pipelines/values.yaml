@@ -309,7 +309,7 @@ global:
     password: ""
 
 
-# PostgreSQL 
+# PostgreSQL
 ## https://hub.helm.sh/charts/bitnami/postgresql
 ## Configuration values for the postgresql dependency
 ## ref: https://github.com/kubernetes/charts/blob/master/stable/postgresql/README.md

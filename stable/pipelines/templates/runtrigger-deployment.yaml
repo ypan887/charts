@@ -61,7 +61,7 @@ spec:
                 name: {{ include "pipelines.fullname" . }}-components-config
           workingDir: /shippable/micro/nod/runTrigger
           resources:
-            {{- toYaml .Values.resources | nindent 12 }}
+            {{- toYaml .Values.runTrigger.resources | nindent 12 }}
       {{- with .Values.runTrigger.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
