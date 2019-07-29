@@ -18,4 +18,4 @@ name: pipelines
 sources:
 - https://bintray.com/beta/#/jfrog/pipelines
 - https://github.com/jfrog/charts/pipelines
-version: 0.3.2
+version: 0.3.3
