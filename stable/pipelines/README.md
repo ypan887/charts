@@ -34,9 +34,9 @@ helm repo update
 ```
 
 ### Install Pipelines Chart
-**Note:** Pipelines only have been properly tested on [GKE](https://cloud.google.com/kubernetes-engine/) with exposing URLs via ingress.
+**Note:** Pipelines only have been properly tested on [Google Cloud GKE](https://cloud.google.com/kubernetes-engine/) with exposing URLs via ingress.
 
-It should work with ingress on [EKS](https://aws.amazon.com/eks/) and [AKS](https://azure.microsoft.com/en-gb/services/kubernetes-service/) as well.
+It should work with ingress on [AWS EKS](https://aws.amazon.com/eks/) and [Azure AKS](https://azure.microsoft.com/en-gb/services/kubernetes-service/) as well.
 
 To test Pipelines please have ready:
 - GKE cluster
