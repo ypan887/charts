@@ -71,17 +71,17 @@ helm template --name pipelines-external-secrets pipelines/ -x templates/pipeline
     -f values-ingress-passwords.yaml | kubectl apply --namespace pipelines -f -
 ```
 
-Install JFrog Pipelines with `values-ingress-external-secret.yaml` file, please **update** URLs there.
+Don't forget **update** URLs in `values-ingress-external-secret.yaml` file.
+Install JFrog Pipelines:
  ```console
 helm upgrade --install pipelines --namespace pipelines jfrog/pipelines -f values-ingress-external-secret.yaml
 ```
 
-## Status
-See the status of your deployed **helm** releases
+### Status
+See the status of your deployed **helm** release:
  ```console
 helm status pipelines
 ```
-The chart be default will install three Kubernetes nodes (deployments) to run jobs on, so you all set there.
 
 ## Useful links
 - https://www.jfrog.com/confluence/display/CICD/Getting+Started

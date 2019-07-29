@@ -55,9 +55,9 @@ validate_manifests() {
         echo "------------------------------------------------------------------------------------------------------------------------"
         echo "==> Processing with default values..."
         echo "------------------------------------------------------------------------------------------------------------------------"
-        TEMPLATE_FILES="${chart_name}/templates/*"
+        TEMPLATE_FILES="${chart_name}/templates"
         # shellcheck disable=SC2086
-        kubeval ${TEMPLATE_FILES}
+        kubeval -d ${TEMPLATE_FILES}
         if [ -d "${REPO_ROOT}/${chart_name}/ci" ]
         then
             FILES="${REPO_ROOT}/${chart_name}/ci/*"
