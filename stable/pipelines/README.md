@@ -72,13 +72,14 @@ helm template --name pipelines-external-secrets pipelines/ -x templates/pipeline
 ```
 
 Don't forget **update** URLs in `values-ingress-external-secret.yaml` file.
+
 Install JFrog Pipelines:
  ```console
 helm upgrade --install pipelines --namespace pipelines jfrog/pipelines -f values-ingress-external-secret.yaml
 ```
 
 ### Status
-See the status of your deployed **helm** release:
+See the status of deployed **helm** release:
  ```console
 helm status pipelines
 ```
