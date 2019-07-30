@@ -68,11 +68,11 @@ api:
   imageRegistry:
     url: docker.bintray.io
 
-  # For production, the unique token should be generated
+  # For production, the unique token should be generated with: uuidgen | tr '[:upper:]' '[:lower:]'
   token: f562d4fa-cf5f-4d58-8b9b-91ef949c024f
 
   # Pipelines ID in Artifactory
-  # For production, the unique ID should be generated instead of using 12345
+  # For production, the unique ID should be generated instead of using 12345: openssl rand | tr -dc 1-9 | head -c 10
   serviceId: jfpip@12345
 
   artifactory:
@@ -308,7 +308,6 @@ global:
     user: "apiuser"
     password: ""
 
-
 # PostgreSQL
 ## https://hub.helm.sh/charts/bitnami/postgresql
 ## Configuration values for the postgresql dependency
@@ -416,8 +415,8 @@ msg:
   #    memory: "250Mi"
   #    cpu: "100m"
   #  limits:
-  #    memory: "550Mi"
-  #    cpu: "200m"
+  #    memory: "1Gi"
+  #    cpu: "900m"
 
   nodeSelector: {}
   affinity: {}
@@ -520,6 +519,7 @@ redis:
     #    cpu: 100m
     #  limits:
     #    memory: 700Mi
+
     affinity: {}
 
   slave:
@@ -529,6 +529,8 @@ redis:
     #    cpu: 100m
     #  limits:
     #    memory: 200Mi
+
+    affinity: {}
 
 # Vault
 vault:
@@ -549,6 +551,14 @@ vault:
     # Supported service types: ClusterIP and NodePort
     type: ClusterIP
     port: 30100
+
+  resources: {}
+  #  requests:
+  #    memory: 256Mi
+  #    cpu: 200m
+  #  limits:
+  #    memory: 1Gi
+  #    cpu: 600m
 
   affinity: {}
   nodeSelector: {}
