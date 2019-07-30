@@ -22,6 +22,10 @@ spec:
     spec:
       restartPolicy: OnFailure
       serviceAccountName: {{ include "pipelines.fullname" . }}-api-setup
+    {{- if .Values.imagePullSecrets }}
+      imagePullSecrets:
+      - name: {{ .Values.imagePullSecrets }}
+    {{- end }}
       containers:
       - name: initialize-api
         image: "{{ .Values.imageRegistry }}/{{ .Values.pipelinesInit.image.repository }}:{{ default .Chart.AppVersion .Values.pipelinesInit.image.tag }}"

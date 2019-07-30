@@ -21,6 +21,10 @@ spec:
         component: rabbitmq
     spec:
       restartPolicy: OnFailure
+    {{- if .Values.imagePullSecrets }}
+      imagePullSecrets:
+      - name: {{ .Values.imagePullSecrets }}
+    {{- end }}
       containers:
       - name: post-install-job
         image: "{{ .Values.imageRegistry }}/{{ .Values.pipelinesInit.image.repository }}:{{ default .Chart.AppVersion .Values.pipelinesInit.image.tag }}"

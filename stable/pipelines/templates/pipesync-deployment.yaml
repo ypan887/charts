@@ -39,11 +39,6 @@ spec:
             until nc -z -w 2 {{ include "pipelines.api.name" . }} {{ .Values.api.service.port }} && echo API ok; do
               sleep 2;
             done;
-    {{- if .Values.securityContext.enabled }}
-      securityContext:
-        runAsUser: {{ .Values.securityContext.uid }}
-        fsGroup: {{ .Values.securityContext.gid }}
-    {{- end }}
       containers:
         - name: api
           image: "{{ .Values.imageRegistry }}/{{ .Values.pipelineSync.image.repository }}:{{ default .Chart.AppVersion .Values.pipelineSync.image.tag }}"
