@@ -104,8 +104,10 @@ spec:
         - '/bin/sh'
         - '-c'
         - >
+        {{- if .Values.api.imageRegistry.imagePullSecret }}
           mkdir -p /root/.docker;
           cp /docker-config/.dockerconfigjson /root/.docker/config.json;
+        {{- end }}
           echo "Pull {{ .Values.api.imageRegistry.url }}/jfrog/pipelines-u18node:{{ default .Chart.AppVersion .Values.api.image.tag }}...";
           docker pull {{ .Values.api.imageRegistry.url }}/jfrog/pipelines-u18node:{{ default .Chart.AppVersion .Values.api.image.tag }};
           export NODE_ID="$(cat /jfrog/node_id)";
