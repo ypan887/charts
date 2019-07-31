@@ -1,6 +1,9 @@
 # JFrog Pipelines Chart Changelog
 All changes to this chart to be documented in this file.
 
+## [0.3.7] - July 31, 2019
+* Support image pull secret for Pipelines Steps image registry
+
 ## [0.3.6] - July 30, 2019
 * Fix pipelineSync permissions
 

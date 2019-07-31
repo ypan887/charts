@@ -11,6 +11,7 @@ runMode: production
 imageRegistry: docker.bintray.io
 
 # For supporting pulling from private registries
+# Secret type: kubernetes.io/dockerconfigjson
 imagePullSecrets:
 
 # Existing secret with Pipelines secrets
@@ -67,6 +68,8 @@ api:
   # Where the Pipelines Steps images get pulled from
   imageRegistry:
     url: docker.bintray.io
+    # Secret type: kubernetes.io/dockerconfigjson
+    imagePullSecret:
 
   # For production, the unique token should be generated with: uuidgen | tr '[:upper:]' '[:lower:]'
   token: f562d4fa-cf5f-4d58-8b9b-91ef949c024f

@@ -104,7 +104,9 @@ spec:
         - '/bin/sh'
         - '-c'
         - >
-          echo "Pull pipelines-u18node:{{ default .Chart.AppVersion .Values.api.image.tag }}...";
+          mkdir -p /root/.docker;
+          cp /docker-config/.dockerconfigjson /root/.docker/config.json;
+          echo "Pull {{ .Values.api.imageRegistry.url }}/jfrog/pipelines-u18node:{{ default .Chart.AppVersion .Values.api.image.tag }}...";
           docker pull {{ .Values.api.imageRegistry.url }}/jfrog/pipelines-u18node:{{ default .Chart.AppVersion .Values.api.image.tag }};
           export NODE_ID="$(cat /jfrog/node_id)";
           pm2-runtime /jfrog/reqKick/reqKick.app.js;
@@ -170,6 +172,10 @@ spec:
         volumeMounts:
         - name: jfrog-pipelines-folder
           mountPath: /jfrog
+      {{- if .Values.api.imageRegistry.imagePullSecret }}
+        - name: docker-config
+          mountPath: /docker-config
+      {{- end }}
     {{- with .Values.nodes.nodeSelector }}
       nodeSelector:
 {{ toYaml . | indent 8 }}
@@ -190,3 +196,8 @@ spec:
       - name: config-volume
         configMap:
           name: {{ include "pipelines.fullname" . }}-node-scripts
+    {{- if .Values.api.imageRegistry.imagePullSecret }}
+      - name: docker-config
+        secret:
+          secretName: {{ .Values.api.imageRegistry.imagePullSecret }}
+    {{- end }}
