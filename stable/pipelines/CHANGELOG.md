@@ -1,6 +1,20 @@
 # JFrog Pipelines Chart Changelog
 All changes to this chart to be documented in this file.
 
+## [0.4.1] - August 20, 2019
+* Fix missing docker cli for dockerBuild and dockerPush
+* Update PostgreSQL chart version to 6.3.0
+* Update Redis chart version to 9.1.0
+
+## [0.4.0] - August 14, 2019
+* Add Helm v3 support
+
+## [0.3.9] - August 14, 2019
+* Improve documentation
+
+## [0.3.8] - August 05, 2019
+* Fix node env vars
+
 ## [0.3.7] - July 31, 2019
 * Support image pull secret for Pipelines Steps image registry
 

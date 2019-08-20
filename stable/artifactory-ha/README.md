@@ -140,18 +140,18 @@ In order to use an existing claim (for data and backup) that is to be shared acr
 - Create PVCs with ReadWriteMany that match the naming conventions:
 ```
   {{ template "artifactory-ha.fullname" . }}-data-pvc-<claim-ordinal>
-  {{ template "artifactory-ha.fullname" . }}-backup-pvc-<claim-ordinal>
+  {{ template "artifactory-ha.fullname" . }}-backup-pvc
 ```
 An example that shows 2 existing claims to be used:
 ```
-  myexample-artifactory-ha-data-pvc-0
-  myexample-artifactory-ha-backup-pvc-0
-  myexample-artifactory-ha-data-pvc-1
-  myexample-artifactory-ha-backup-pvc-1
+  myexample-data-pvc-0
+  myexample-data-pvc-1
+  myexample-backup-pvc
 ```
-- Set the artifactory.persistence.file-system.existingSharedClaim.enabled in values.yaml to true:
+- Set the artifactory.persistence.fileSystem.existingSharedClaim.enabled in values.yaml to true:
 ```
 -- set artifactory.persistence.fileSystem.existingSharedClaim.enabled=true
+-- set artifactory.persistence.fileSystem.existingSharedClaim.numberOfExistingClaims=2
 ```
 
 #### NFS
@@ -213,6 +213,42 @@ To use Azure Blob Storage as the cluster's filestore. See [Azure Blob Storage Bi
 ...
 ```
 
+#### Custom binarystore.xml
+You have an option to provide a custom [binarystore.xml](https://www.jfrog.com/confluence/display/RTF/Configuring+the+Filestore).<br>
+There are two options for this
+
+1. Editing directly in [values.yaml](values.yaml)
+```yaml
+artifactory:
+  persistence:
+    binarystoreXml: |
+      <!-- Your custom binarystore.xml snippet -->
+
+```
+
+2. Create your own [Secret](https://kubernetes.io/docs/concepts/configuration/secret/) and pass it to your `helm install` command
+```yaml
+# Prepare your custom Secret file (custom-binarystore.yaml)
+kind: Secret
+apiVersion: v1
+metadata:
+  name: custom-binarystore
+  labels:
+    app: artifactory
+    chart: artifactory
+stringData:
+  binarystore.xml: |-
+      <!-- Your custom binarystore.xml snippet -->
+```
+
+```bash
+# Create a secret from the file
+kubectl apply -n artifactory -f ./custom-binarystore.yaml
+
+# Pass it to your helm install command:
+helm install --name artifactory-ha --set artifactory.persistence.customBinarystoreXmlSecret=custom-binarystore jfrog/artifactory-ha
+```
+
 ### Create a unique Master Key
 Artifactory HA cluster requires a unique master key. By default the chart has one set in values.yaml (`artifactory.masterKey`).
 
@@ -243,14 +279,17 @@ helm install --name artifactory-ha --set artifactory.masterKeySecretName=my-secr
 **NOTE:** In either case, make sure to pass the same master key on all future calls to `helm install` and `helm upgrade`! In the first case, this means always passing `--set artifactory.masterKey=${MASTER_KEY}`. In the second, this means always passing `--set artifactory.masterKeySecretName=my-secret` and ensuring the contents of the secret remain unchanged.
 
 ### Install Artifactory HA license
-For activating Artifactory HA, you must install an appropriate license. There are two ways to manage the license. **Artifactory UI** or a **Kubernetes Secret**.
+For activating Artifactory HA, you must install an appropriate license. There are three ways to manage the license. **Artifactory UI**, **REST API**, or a **Kubernetes Secret**.
 
-The easier and recommended way is the **Artifactory UI**. Using the **Kubernetes Secret** is for advanced users and is better suited for automation.
+The easier and recommended way is the **Artifactory UI**. Using the **Kubernetes Secret** or **REST API** is for advanced users and is better suited for automation.
 
 **IMPORTANT:** You should use only one of the following methods. Switching between them while a cluster is running might disable your Artifactory HA cluster!
 
 ##### Artifactory UI
-Once primary cluster is running, open Artifactory UI and insert the license(s) in the UI. See [HA installation and setup](https://www.jfrog.com/confluence/display/RTF/HA+Installation+and+Setup) for more details
+Once primary cluster is running, open Artifactory UI and insert the license(s) in the UI. See [HA installation and setup](https://www.jfrog.com/confluence/display/RTF/HA+Installation+and+Setup) for more details. **Note that you should enter all licenses at once, with each license is separated by a newline.** If you add the licenses one at a time, you may get redirected to a node without a license and the UI won't load for that node.
+
+##### REST API
+You can add licenses via REST API (https://www.jfrog.com/confluence/display/RTF/Artifactory+REST+API#ArtifactoryRESTAPI-InstallHAClusterLicenses). Note that the REST API expects "\n" for the newlines in the licenses.
 
 ##### Kubernetes Secret
 You can deploy the Artifactory license(s) as a [Kubernetes secret](https://kubernetes.io/docs/concepts/configuration/secret/).
@@ -296,7 +335,7 @@ In the `networkpolicy` section of values.yaml you can specify a list of NetworkP
 For podSelector, ingress and egress, if nothing is provided then a default `- {}` is applied which is to allow everything.
 
 A full (but very wide open) example that results in 2 NetworkPolicy objects being created:
-```
+```yaml
 networkpolicy:
   # Allows all ingress and egress to/from artifactory primary and member pods.
   - name: artifactory
@@ -361,19 +400,17 @@ jconsole <release-name>:<node-jmx-port>
 * User guide to [bootstrap Artifactory Access credentials](https://www.jfrog.com/confluence/display/ACC/Configuring+Access)
 
 1. Create `access-creds-values.yaml` and provide the IP (By default 127.0.0.1) and password:
-```
+```yaml
 artifactory:
-   accessAdmin:
+  accessAdmin:
     ip: "<IP_RANGE>" #Example: "*"
     password: "<PASSWD>"
-
-postgresql:
-  postgresPassword: "<DB_PASSWD>"
 ```
 
 2. Apply the `access-creds-values.yaml` file:
-
- `helm upgrade <helm_release_name> --install jfrog/artifactory-ha -f access-creds-values.yaml`
+```bash
+helm upgrade --install artifactory-ha jfrog/artifactory-ha -f access-creds-values.yaml
+```
 
 ### Bootstrapping Artifactory
 **IMPORTANT:** Bootstrapping Artifactory needs license. Pass license as shown in above section.
@@ -382,7 +419,7 @@ postgresql:
 * User guide to [bootstrap Artifactory Security Configuration](https://www.jfrog.com/confluence/display/RTF/Configuration+Files#ConfigurationFiles-BootstrappingtheSecurityConfiguration)
 
 Create `bootstrap-config.yaml` with artifactory.config.import.xml and security.import.xml as shown below:
-```
+```yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -455,14 +492,14 @@ kubectl delete pvc volume-artifactory-node-2
 ### Use an external Database
 
 #### PostgreSQL
-There are cases where you will want to use external PostgreSQL with a different database name e.g. `my-artifactory-db`, then you need set a custom PostgreSQL connection URL, where `databaseName=my-artifactory-db`.
+There are cases where you will want to use external PostgreSQL with a different database name e.g. `my-artifactory-db`, then you need set a custom PostgreSQL connection URL, where `my-artifactory-db` is the database name.
 
 This can be done with the following parameters
 ```bash
 ...
 --set postgresql.enabled=false \
 --set database.type=postgresql \
---set database.url='jdbc:sqlserver://${DB_HOST}:${DB_PORT};databaseName=my-artifactory-db;sendStringParametersAsUnicode=false;applicationName=Artifactory Binary Repository' \
+--set database.url='jdbc:postgresql://${DB_HOST}:${DB_PORT}/my-artifactory-db' \
 --set database.user=${DB_USER} \
 --set database.password=${DB_PASSWORD} \
 ...
@@ -546,7 +583,7 @@ kubectl logs -n <NAMESPACE> <POD_NAME> -c <LOG_CONTAINER_NAME>
 There are cases where a special, unsupported init processes is needed like checking something on the file system or testing something before spinning up the main container.
 
 For this, there is a section for writing a custom init container in the [values.yaml](values.yaml). By default it's commented out
-```
+```yaml
 artifactory:
   ## Add custom init containers
   customInitContainers: |
@@ -557,7 +594,7 @@ artifactory:
 There are cases where an extra sidecar container is needed. For example monitoring agents or log collection.
 
 For this, there is a section for writing a custom sidecar container in the [values.yaml](values.yaml). By default it's commented out
-```
+```yaml
 artifactory:
   ## Add custom sidecar containers
   customSidecarContainers: |
@@ -565,7 +602,7 @@ artifactory:
 ```
 
 You can configure the sidecar to run as a custom user if needed by setting the following in the container template
-```
+```yaml
   # Example of running container as root (id 0)
   securityContext:
     runAsUser: 0
@@ -576,7 +613,7 @@ You can configure the sidecar to run as a custom user if needed by setting the f
 If you need to use a custom volume in a custom init or sidecar container, you can use this option.
 
 For this, there is a section for defining custom volumes in the [values.yaml](values.yaml). By default it's commented out
-```
+```yaml
 artifactory:
   ## Add custom volumes
   customVolumes: |
@@ -587,7 +624,7 @@ artifactory:
 If you need to add [Artifactory User Plugin](https://github.com/jfrog/artifactory-user-plugins), you can use this option.
 
 Create a secret with [Artifactory User Plugin](https://github.com/jfrog/artifactory-user-plugins) by following command:
-```
+```bash
 # Secret with single user plugin
 kubectl  create secret generic archive-old-artifacts --from-file=archiveOldArtifacts.groovy --namespace=artifactory-ha 
 
@@ -604,7 +641,7 @@ artifactory:
 ```
 
 You can now pass the created `plugins.yaml` file to helm install command to deploy Artifactory with user plugins as follows:
-```
+```bash
 helm install --name artifactory-ha -f plugins.yaml jfrog/artifactory-ha
 ```
 
@@ -680,6 +717,8 @@ The following table lists the configurable parameters of the artifactory chart a
 | `artifactory.persistence.enabled`      | Artifactory persistence volume enabled              | `true`                          |
 | `artifactory.persistence.accessMode`   | Artifactory persistence volume access mode          | `ReadWriteOnce`                 |
 | `artifactory.persistence.size`         | Artifactory persistence or local volume size        | `200Gi`                         |
+| `artifactory.persistence.binarystoreXml` | Artifactory binarystore.xml template              | See `values.yaml`               |
+| `artifactory.persistence.customBinarystoreXmlSecret` | A custom Secret for binarystore.xml   | ``                              |
 | `artifactory.persistence.maxCacheSize` | Artifactory cache-fs provider maxCacheSize in bytes | `50000000000`                   |
 | `artifactory.persistence.cacheProviderDir` | the root folder of binaries for the filestore cache. If the value specified starts with a forward slash ("/") it is considered the fully qualified path to the filestore folder. Otherwise, it is considered relative to the *baseDataDir*. | `cache`                   |
 | `artifactory.persistence.type`         | Artifactory HA storage type                         | `file-system`                   |
@@ -714,7 +753,7 @@ The following table lists the configurable parameters of the artifactory chart a
 | `artifactory.persistence.azureBlob.endpoint`        | Azure Blob Storage endpoint            | ``                        |
 | `artifactory.persistence.azureBlob.containerName`   | Azure Blob Storage container name      | ``                        |
 | `artifactory.persistence.azureBlob.testConnection`  | Azure Blob Storage test connection     | `false`                   |
-| `artifactory.persistence.fileStorage.existingSharedClaim` | Enable using an existing shared pvc | `false`                             |
+| `artifactory.persistence.fileSystem.existingSharedClaim` | Enable using an existing shared pvc | `false`                             |
 | `artifactory.persistence.fileStorage.dataDir`             | HA data directory                   | `/var/opt/jfrog/artifactory/artifactory-data`     |
 | `artifactory.persistence.fileStorage.backupDir`           | HA backup directory                 | `/var/opt/jfrog/artifactory-backup` |
 | `artifactory.javaOpts.other`                        | Artifactory additional java options (for all nodes) |              |
@@ -840,7 +879,7 @@ Specify each parameter using the `--set key=value[,key=value]` argument to `helm
 
 ### Ingress and TLS
 To get Helm to create an ingress object with a hostname, add these two lines to your Helm command:
-```
+```bash
 helm install --name artifactory-ha \
   --set ingress.enabled=true \
   --set ingress.hosts[0]="artifactory.company.com" \
@@ -853,13 +892,13 @@ If your cluster allows automatic creation/retrieval of TLS certificates (e.g. [c
 
 To manually configure TLS, first create/retrieve a key & certificate pair for the address(es) you wish to protect. Then create a TLS secret in the namespace:
 
-```console
+```bash
 kubectl create secret tls artifactory-tls --cert=path/to/tls.cert --key=path/to/tls.key
 ```
 
 Include the secret's name, along with the desired hostnames, in the Artifactory Ingress TLS section of your custom `values.yaml` file:
 
-```
+```yaml
   ingress:
     ## If true, Artifactory Ingress will be created
     ##
@@ -885,7 +924,7 @@ Include the secret's name, along with the desired hostnames, in the Artifactory 
 
 This example specifically enables Artifactory to work as a Docker Registry using the Repository Path method. See [Artifactory as Docker Registry](https://www.jfrog.com/confluence/display/RTF/Getting+Started+with+Artifactory+as+a+Docker+Registry) documentation for more information about this setup.
 
-```
+```yaml
 ingress:
   enabled: true
   defaultBackend:
@@ -913,14 +952,32 @@ You have the option to add additional ingress rules to the Artifactory ingress. 
 In order to do that, simply add the following to a `artifactory-ha-values.yaml` file:
 ```yaml
 ingress:
-  additionalRules:
-  - host: <INGRESS_HOSTNAME>
-    http:
-      paths:
-        - path: /xray
-          backend:
-            serviceName: <XRAY_SERVICE_NAME>
-            servicePort: <XRAY_SERVICE_PORT>
+  enabled: true
+
+  defaultBackend:
+    enabled: false
+
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      rewrite "(?i)/xray(/|$)(.*)" /$2 break;
+
+  additionalRules: |
+    - host: <MY_HOSTNAME>
+      http:
+        paths:
+          - path: /
+            backend:
+              serviceName: <XRAY_SERVER_SERVICE_NAME>
+              servicePort: <XRAY_SERVER_SERVICE_PORT>
+          - path: /xray
+            backend:
+              serviceName: <XRAY_SERVER_SERVICE_NAME>
+              servicePort: <XRAY_SERVER_SERVICE_PORT>
+          - path: /artifactory
+            backend:
+              serviceName: {{ template "artifactory.nginx.fullname" . }}
+              servicePort: {{ .Values.nginx.externalPortHttp }}
 ``` 
 
 and running:

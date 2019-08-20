@@ -28,7 +28,7 @@ spec:
         component: {{ .Values.artifactory.name }}
         release: {{ .Release.Name }}
       annotations:
-        checksum/binarystore: {{ include (print $.Template.BasePath "/artifactory-binarystore.yaml") . | sha256sum }}
+        checksum/binarystore: {{ include (print $.Template.BasePath "/artifactory-binarystore-secret.yaml") . | sha256sum }}
       {{- range $key, $value := .Values.artifactory.annotations }}
         {{ $key }}: {{ $value | quote }}
       {{- end }}
@@ -52,7 +52,7 @@ spec:
         - 'sh'
         - '-c'
         - >
-          mkdir {{ .Values.artifactory.persistence.fileSystem.existingSharedClaim.dataDir }}
+          mkdir -p {{ tpl .Values.artifactory.persistence.fileSystem.existingSharedClaim.dataDir . }};
         volumeMounts:
         - mountPath: {{ .Values.artifactory.persistence.mountPath | quote }}
           name: volume
@@ -77,12 +77,22 @@ spec:
         - 'sh'
         - '-c'
         - >
-          if [ -d {{ .Values.artifactory.persistence.mountPath }}/lost+found ]; then
-            rm -rfv {{ .Values.artifactory.persistence.mountPath }}/lost+found
-          fi
+          rm -rfv {{ .Values.artifactory.persistence.mountPath }}/lost+found;
+          rm -rfv {{ tpl .Values.artifactory.persistence.fileSystem.existingSharedClaim.dataDir . }}/lost+found;
+          rm -rfv {{ .Values.artifactory.persistence.fileSystem.existingSharedClaim.backupDir }}/lost+found;
         volumeMounts:
-        - mountPath: {{ .Values.artifactory.persistence.mountPath | quote }}
-          name: volume
+          - name: volume
+            mountPath: "{{ .Values.artifactory.persistence.mountPath }}"
+      {{- if eq .Values.artifactory.persistence.type "file-system" }}
+        {{- if .Values.artifactory.persistence.fileSystem.existingSharedClaim.enabled }}
+          {{- range $sharedClaimNumber, $e := until (.Values.artifactory.persistence.fileSystem.existingSharedClaim.numberOfExistingClaims|int) }}
+          - name: artifactory-ha-data-{{ $sharedClaimNumber }}
+            mountPath: "{{ tpl $.Values.artifactory.persistence.fileSystem.existingSharedClaim.dataDir $ }}/filestore{{ $sharedClaimNumber }}"
+            {{- end }}
+          - name: artifactory-ha-backup
+            mountPath: "{{ $.Values.artifactory.persistence.fileSystem.existingSharedClaim.backupDir }}"
+        {{- end }}
+      {{- end }}
       - name: "wait-for-db"
         image: "{{ .Values.initContainerImage }}"
         command:
@@ -243,7 +253,7 @@ spec:
       {{- if eq .Values.artifactory.persistence.type "file-system" }}
         {{- if .Values.artifactory.persistence.fileSystem.existingSharedClaim.enabled }}
         - name: HA_DATA_DIR
-          value: "{{ .Values.artifactory.persistence.fileSystem.existingSharedClaim.dataDir }}"
+          value: "{{ tpl .Values.artifactory.persistence.fileSystem.existingSharedClaim.dataDir . }}"
         - name: HA_BACKUP_DIR
           value: "{{ .Values.artifactory.persistence.fileSystem.existingSharedClaim.backupDir }}"
         {{- end }}
@@ -278,7 +288,7 @@ spec:
         {{- if .Values.artifactory.persistence.fileSystem.existingSharedClaim.enabled }}
           {{- range $sharedClaimNumber, $e := until (.Values.artifactory.persistence.fileSystem.existingSharedClaim.numberOfExistingClaims|int) }}
         - name: artifactory-ha-data-{{ $sharedClaimNumber }}
-          mountPath: "{{ $.Values.artifactory.persistence.fileSystem.existingSharedClaim.dataDir }}/filestore{{ $sharedClaimNumber }}"
+          mountPath: "{{ tpl $.Values.artifactory.persistence.fileSystem.existingSharedClaim.dataDir $ }}/filestore{{ $sharedClaimNumber }}"
           {{- end }}
         - name: artifactory-ha-backup
           mountPath: "{{ $.Values.artifactory.persistence.fileSystem.existingSharedClaim.backupDir }}"
@@ -405,8 +415,12 @@ spec:
     {{- end }}
       volumes:
       - name: binarystore-xml
-        configMap:
-          name: {{ template "artifactory-ha.fullname" . }}-bs
+        secret:
+          {{- if .Values.artifactory.persistence.customBinarystoreXmlSecret }}
+          secretName: {{ .Values.artifactory.persistence.customBinarystoreXmlSecret }}
+          {{- else }}
+          secretName: {{ template "artifactory-ha.fullname" . }}-binarystore
+          {{- end }}
       - name: installer-info
         configMap:
           name: {{ template "artifactory-ha.fullname" . }}-installer-info

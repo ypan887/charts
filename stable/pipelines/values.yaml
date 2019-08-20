@@ -404,6 +404,7 @@ msg:
     #    hosts:
     #      - chart-example.local
 
+  ## Do not change default username and password, as otherwise Pipelines bootstrap will fail !!!
   rabbitmqUsername: guest
   rabbitmqPassword: guest
   rabbitmqNodePort: 30200

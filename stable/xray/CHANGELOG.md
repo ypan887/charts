@@ -1,6 +1,12 @@
 # JFrog Xray Chart Changelog
 All changes to this chart will be documented in this file.
 
+## [1.0.5] - Aug 13, 2019
+* Add the option to provide a precreated secret for XRAY_MASTER_KEY
+
+## [1.0.4] - Aug 11, 2019
+* Add information about Xray ingress additionalRules
+
 ## [1.0.3] - Jul 22, 2019
 * Change Ingress API to be compatible with recent kubernetes versions
 

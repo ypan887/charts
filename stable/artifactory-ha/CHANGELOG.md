@@ -1,6 +1,37 @@
 # JFrog Artifactory-ha Chart Changelog
 All changes to this chart will be documented in this file.
 
+## [0.15.15] - Aug 18, 2019
+* Fix existingSharedClaim permissions issue and example 
+
+## [0.15.14] - Aug 14, 2019
+* Updated Artifactory version to 6.11.6
+
+## [0.15.13] - Aug 11, 2019
+* Fix Ingress routing and add an example
+
+## [0.15.12] - Aug 6, 2019
+* Do not mount `access/etc/bootstrap.creds` unless user specifies a custom password or secret (Access already generates a random password if not provided one)
+* If custom `bootstrap.creds` is provided (using keys or custom secret), prepare it with an init container so the temp file does not persist
+
+## [0.15.11] - Aug 5, 2019
+* Improve binarystore config
+    1. Convert to a secret
+    2. Move config to values.yaml
+    3. Support an external secret 
+
+## [0.15.10] - Aug 5, 2019
+* Don't create the nginx configmaps when nginx.enabled is false
+
+## [0.15.9] - Aug 1, 2019
+* Fix masterkey/masterKeySecretName not specified warning render logic in NOTES.txt
+
+## [0.15.8] - Jul 28, 2019
+* Simplify nginx setup and shorten initial wait for probes 
+
+## [0.15.7] - Jul 25, 2019
+* Updated README about how to apply Artifactory licenses
+
 ## [0.15.6] - Jul 22, 2019
 * Change Ingress API to be compatible with recent kubernetes versions
 

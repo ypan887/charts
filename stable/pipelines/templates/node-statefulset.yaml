@@ -108,8 +108,8 @@ spec:
           mkdir -p /root/.docker;
           cp /docker-config/.dockerconfigjson /root/.docker/config.json;
         {{- end }}
-          echo "Pull {{ .Values.api.imageRegistry.url }}/jfrog/pipelines-u18node:{{ default .Chart.AppVersion .Values.api.image.tag }}...";
-          docker pull {{ .Values.api.imageRegistry.url }}/jfrog/pipelines-u18node:{{ default .Chart.AppVersion .Values.api.image.tag }};
+          echo "Pull ${IMAGE_REGISTRY_URL}/jfrog/pipelines-u18node:{{ default .Chart.AppVersion .Values.api.image.tag }} and copy docker cli ...";
+          docker run -v /usr/local/bin:/tmp/init-docker -v /opt/docker:/opt/docker {{ .Values.api.imageRegistry.url }}/jfrog/pipelines-u18node:{{ default .Chart.AppVersion .Values.api.image.tag }} /bin/sh -c "cp -f /tmp/init-docker/docker /opt/docker/";
           export NODE_ID="$(cat /jfrog/node_id)";
           pm2-runtime /jfrog/reqKick/reqKick.app.js;
         lifecycle:
@@ -125,6 +125,8 @@ spec:
         env:
         - name: NODE_ID
           value: ""
+        - name: IMAGE_REGISTRY_URL
+          value: {{ .Values.api.imageRegistry.url }}
         - name: PIPELINES_API_IP
           value: {{ include "pipelines.api.name" . }}
         - name: PIPELINES_API_PORT

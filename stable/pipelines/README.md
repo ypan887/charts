@@ -28,61 +28,69 @@ This chart will do the following:
 
 ### Add JFrog Helm repository
 Before installing JFrog helm charts, you need to add the [JFrog helm repository](https://charts.jfrog.io/) to your helm client
- ```console
+ ```bash
 helm repo add jfrog https://charts.jfrog.io
 helm repo update
 ```
 
 ### Install Pipelines Chart
-**Note:** Pipelines only have been properly tested on [Google Cloud GKE](https://cloud.google.com/kubernetes-engine/) with exposing URLs via ingress.
+**Note:** Pipelines has only been properly tested on [Google Cloud GKE](https://cloud.google.com/kubernetes-engine/) with ingress.
 
 It should work with ingress on [AWS EKS](https://aws.amazon.com/eks/) and [Azure AKS](https://azure.microsoft.com/en-gb/services/kubernetes-service/) as well.
 
-To test Pipelines please have ready:
-- GKE cluster
-- [Artifactory HA](https://hub.helm.sh/charts/jfrog/artifactory-ha) with Enterprise+ License
-- [Artifactory Custom Base URL](https://www.jfrog.com/confluence/display/RTF/Configuring+Artifactory) e.g. 
+#### Pre-requisites 
+Before deploying Pipelines you need to have the following
+- A Google [GKE](https://cloud.google.com/kubernetes-engine/) cluster
+- An [Artifactory HA](https://hub.helm.sh/charts/jfrog/artifactory-ha) with Enterprise+ License
+- The [Artifactory Base URL](https://www.jfrog.com/confluence/display/RTF/Configuring+Artifactory). For example:
 ```
-Main URL https://artifactory.example.com
-Custom Base URL: https://myartifactory.example.com/artifactory
+Artifactory URL: https://artifactory.example.com
+Artifactory Base URL: https://artifactory.example.com/artifactory
 ```
-- [Nginx-ingress controller](https://hub.helm.sh/charts/stable/nginx-ingress)
-- [Cert-manager](https://hub.helm.sh/charts/jetstack/cert-manager) (optional) installed there or use your own TLS cert for your domain.
+- A static (external) IP in your GCP account to simplify connectivity with Artifactory. See [GCP guide](https://cloud.google.com/compute/docs/ip-addresses/reserve-static-external-ip-address)
+- Deployed [Nginx-ingress controller](https://hub.helm.sh/charts/stable/nginx-ingress)
+- [Optional] Deployed [Cert-manager](https://hub.helm.sh/charts/jetstack/cert-manager) for automatic management of TLS certificates with [Lets Encrypt](https://letsencrypt.org/)
+- [Optional] TLS secret needed for https access
 
-As you will need `values-ingress.yaml`, `values-ingress-passwords.yaml` and `values-ingress-external-secret.yaml` files in later steps, pull latest chart:
-```console
+#### Prepare configurations
+Fetch the JFrog Pipelines helm chart to ge the needed configuration files
+```bash
 helm fetch jfrog/pipelines --untar
 ```
 
-Please **update**:
+Edit local copies of `values-ingress.yaml`, `values-ingress-passwords.yaml` and `values-ingress-external-secret.yaml` with the needed configuration values 
+
 - URLs in `values-ingress.yaml`
+  - Artifactory URL
+  - Ingress hosts
+  - Ingress tls secrets
 - Passwords in `values-ingress-passwords.yaml`
 
-Install JFrog Pipelines:
- ```console
+#### Install JFrog Pipelines
+Install JFrog Pipelines
+ ```bash
 helm upgrade --install pipelines --namespace pipelines jfrog/pipelines -f values-ingress.yaml -f values-ingress-passwords.yaml
 ```
 
-### How to use external secret
-
-**Note:** It is in best recommended practices to use external secrets instead of storing passwords in `values.yaml` files.
+### Use external secret
+**Note:** Best practice is to use external secrets instead of storing passwords in `values.yaml` files.
 
 Fill in all required passwords in `values-ingress-passwords.yaml` and create and install the external secret:
-```console
+```bash
 helm template --name pipelines-external-secrets pipelines/ -x templates/pipelines-secrets.yaml \
     -f values-ingress-passwords.yaml | kubectl apply --namespace pipelines -f -
 ```
 
-Don't forget **update** URLs in `values-ingress-external-secret.yaml` file.
+Don't forget to **update** URLs in `values-ingress-external-secret.yaml` file.
 
 Install JFrog Pipelines:
- ```console
+ ```bash
 helm upgrade --install pipelines --namespace pipelines jfrog/pipelines -f values-ingress-external-secret.yaml
 ```
 
 ### Status
 See the status of deployed **helm** release:
- ```console
+ ```bash
 helm status pipelines
 ```
 

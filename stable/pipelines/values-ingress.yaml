@@ -1,16 +1,21 @@
-
 # Override values for pipelines.
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
-# Pipelines micro-services
+## JFrog Pipelines API server
 api:
   replicaCount: 1
-  
-  serviceId: jfpip@2019223311
-  
+
+  ## Set this instance of JFrog Pipelines' service ID to be registered in Artifactory.
+  ## For production, the unique ID should be generated instead of using 123456789: openssl rand | tr -dc 1-9 | head -c 10
+  serviceId: jfpip@123456789
+
+  # Artifactory connection details
   artifactory:
+    ## The Artifactory URL to be use by JFrog Pipelines for authentication.
+    ## DO NOT add the /artifactory to the URL.
     url: https://artifactory.example.com
+    ## The user should have admin privileges on Artifactory.
     username: admin
 
   rabbitMq:
@@ -20,15 +25,20 @@ api:
   ingress:
     enabled: true
     annotations:
+      ## If NOT using letsencrypt, you can omit these two lines
       certmanager.k8s.io/cluster-issuer: "letsencrypt-prod"
       kubernetes.io/tls-acme: "true"
+      ## If NOT using letsencrypt, you can omit two lines above
+
       ingress.kubernetes.io/force-ssl-redirect: "true"
       ingress.kubernetes.io/proxy-body-size: "0"
       ingress.kubernetes.io/proxy-read-timeout: "600"
       ingress.kubernetes.io/proxy-send-timeout: "600"
       kubernetes.io/ingress.class: nginx
-      # nginx.ingress.kubernetes.io/whitelist-source-range: "1.2.3.4/32"
       nginx.ingress.kubernetes.io/proxy-body-size: "0"
+
+      ## Set a custom whitelist IP CIDRs. Comma delimited.
+      # nginx.ingress.kubernetes.io/whitelist-source-range: "1.2.3.4/32,2.3.4.5/32"
     path: /
     hosts:
       - pipelines-api.example.com    
@@ -37,6 +47,8 @@ api:
         hosts:
           - pipelines-api.example.com
 
+
+## JFrog Pipelines web server
 www:
   replicaCount: 1
 
@@ -52,15 +64,20 @@ www:
   ingress:
     enabled: true
     annotations:
+      ## If NOT using letsencrypt, you can omit these two lines
       certmanager.k8s.io/cluster-issuer: "letsencrypt-prod"
       kubernetes.io/tls-acme: "true"
+      ## If NOT using letsencrypt, you can omit two lines above
+
       ingress.kubernetes.io/force-ssl-redirect: "true"
       ingress.kubernetes.io/proxy-body-size: "0"
       ingress.kubernetes.io/proxy-read-timeout: "600"
       ingress.kubernetes.io/proxy-send-timeout: "600"
       kubernetes.io/ingress.class: nginx
-      # nginx.ingress.kubernetes.io/whitelist-source-range: "1.2.3.4/32"
       nginx.ingress.kubernetes.io/proxy-body-size: "0"
+
+      ## Set a custom whitelist IP CIDRs. Comma delimited.
+      # nginx.ingress.kubernetes.io/whitelist-source-range: "1.2.3.4/32,2.3.4.5/32"
     path: /
     hosts:
       - pipelines.example.com    
@@ -69,7 +86,8 @@ www:
         hosts:
           - pipelines.example.com
 
-# RabbitMQ
+
+## JFrog Pipelines RabbitMQ server
 msg:
 
   # LoadBalancer to access RabbitMQ by Node-pool VMs
@@ -93,20 +111,24 @@ msg:
   ingress:
     enabled: true
     annotations:
+      ## If NOT using letsencrypt, you can omit these two lines
       certmanager.k8s.io/cluster-issuer: "letsencrypt-prod"
       kubernetes.io/tls-acme: "true"
+      ## If NOT using letsencrypt, you can omit two lines above
+
       ingress.kubernetes.io/force-ssl-redirect: "true"
       ingress.kubernetes.io/proxy-body-size: "0"
       ingress.kubernetes.io/proxy-read-timeout: "600"
       ingress.kubernetes.io/proxy-send-timeout: "600"
       kubernetes.io/ingress.class: nginx
-      # nginx.ingress.kubernetes.io/whitelist-source-range: "1.2.3.4/32"
       nginx.ingress.kubernetes.io/proxy-body-size: "0"
-    
+
+      ## Set a custom whitelist IP CIDRs. Comma delimited.
+      # nginx.ingress.kubernetes.io/whitelist-source-range: "1.2.3.4/32,2.3.4.5/32"
     path: /
     hosts:
-      - "pipelines-msg.example.com" 
+      - pipelines-msg.example.com
     tls:
-      - secretName: "pipelines-msg.example.com"
+      - secretName: pipelines-msg.example.com
         hosts:
-          - "pipelines-msg.example.com"
+          - pipelines-msg.example.com
