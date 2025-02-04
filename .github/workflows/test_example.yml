@@ -1,0 +1,68 @@
+name: Manually deploy helm examples and validate the results
+
+on:
+  workflow_dispatch: # deploy on demand
+    inputs:
+      namespace:
+        description: "Which namespace to deploy to?"
+        type: choice
+        required: true
+        options: 
+        - "artifactory" 
+        default: "artifactory"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: dlmatti/helm-action@v1
+        with:
+          helm-version: 'latest'
+
+      - name: Write out the kubeconfig info
+        run: |
+          echo ${{ secrets.DEPLOY_ACCOUNT }} | base64 -d > /tmp/config
+
+      - name: Create namespace
+        id: namespace
+        run: |
+          kubectl create namespace ${{ github.event.inputs.namespace }}
+
+      - name: Deploy Helm chart
+        run: |
+          helm upgrade --install my-release ./ --namespace ${{ github.event.inputs.namespace }} -f ./examples/values.yaml
+
+      - name: Wait for all pods to be ready
+        run: |
+          TIMEOUT=600
+          START=$(date +%s)
+          while true; do
+            STATUS=$(kubectl get pods --namespace $NAMESPACE --field-selector=status.phase=Running --no-headers | wc -l)
+            TOTAL=$(kubectl get pods --namespace $NAMESPACE --no-headers | wc -l)
+            if [[ "$STATUS" -eq "$TOTAL" && "$TOTAL" -gt 0 ]]; then
+              echo "All pods are running!"
+              exit 0
+            fi
+            
+            if [[ $(( $(date +%s) - START )) -ge $TIMEOUT ]]; then
+              echo "Timeout reached: some pods are not running!"
+              kubectl get pods --namespace $NAMESPACE
+              exit 1
+            fi
+            sleep 10
+          done
+
+      - name: Remove kubeconfig info
+        run: rm -f /tmp/config
+
+      - name: Delete helm release
+        run: helm uninstall my-release
+
+      - name: Delete namespace
+        run: |
+          kubectl delete namespace $NAMESPACE || echo "Failed to delete namespace"
